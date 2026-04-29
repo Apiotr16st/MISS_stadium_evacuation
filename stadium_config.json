@@ -1,0 +1,131 @@
+{
+  "window": {
+    "title": "MISS - model pojedynczej trybuny stadionu",
+    "fps": 60,
+    "ui_width": 330
+  },
+  "tile_size": 26,
+  "agent": {
+    "radius": 9,
+    "speed": 155,
+    "color": "#ffd166"
+  },
+  "layout": {
+    "type": "text",
+    "spawn_tile": "A",
+    "floor_tile": ".",
+    "solid_tiles": [
+      "#",
+      "P",
+      "D"
+    ],
+    "stairs_tiles": [
+      "S"
+    ],
+    "exit_tiles": [
+      "E",
+      "T"
+    ],
+    "map": [
+      "##############################################",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDDDDSSSDDDDDDDDDDDDDDDDDDDD#",
+      "#.....................SSS....................#",
+      "#DDDDDDDDDDDDDDDDDDSSSSSSSSSDDDDDDDDDDDDDDDDD#",
+      "#..................SSSSSSSSS.................#",
+      "#..................SSPDDDPSS.................#",
+      "#DDDDDDDDDDDDDDDDDDSSPTTTPSSDDDDDDDDDDDDDDDDD#",
+      "#..................SSP...PSS.................#",
+      "#DDDDDDDDDDDDDDDDDDSSP...PSSDDDDDDDDDDDDDDDDD#",
+      "#..................SSP...PSS.................#",
+      "#DDDDDDDDDDDDDDDDDDSSP.A.PSSDDDDDDDDDDDDDDDDD#",
+      "#............................................#",
+      "#............................................#",
+      "##############################################"
+    ]
+  },
+  "tiles": {
+    ".": {
+      "name": "korytarz",
+      "color": "#2b333b",
+      "solid": false
+    },
+    "#": {
+      "name": "sciana / granica",
+      "color": "#404a54",
+      "solid": true
+    },
+    "D": {
+      "name": "pozioma sciana",
+      "color": "#693039",
+      "solid": true,
+      "edges": [
+        "D"
+      ],
+      "visual_height_ratio": 0.35,
+      "collision_height_ratio": 1.0
+    },
+    "P": {
+      "name": "pionowa sciana",
+      "color": "#693039",
+      "solid": true,
+      "edges": [
+        "P"
+      ],
+      "visual_width_ratio": 0.35,
+      "collision_width_ratio": 1.0
+    },
+    "S": {
+      "name": "schody",
+      "color": "#8d98a1",
+      "solid": false
+    },
+    "E": {
+      "name": "wyjscie ewakuacyjne",
+      "color": "#27915b",
+      "solid": false
+    },
+    "T": {
+      "name": "tunel",
+      "color": "#0b1014",
+      "solid": false
+    },
+    "A": {
+      "name": "start agenta",
+      "color": "#2b333b",
+      "solid": false
+    }
+  },
+  "image_palette": {
+    "#2B333B": ".",
+    "#404A54": "#",
+    "#693039": "D",
+    "#8C3B45": "P",
+    "#8D98A1": "S",
+    "#27915B": "E",
+    "#0B1014": "T",
+    "#FFD166": "A"
+  }
+}
