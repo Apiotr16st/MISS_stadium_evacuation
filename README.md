@@ -43,6 +43,7 @@ Parametry agentow ustawisz w sekcjach `agent` i `crowd`.
 
 Sterowanie:
 
+- Ekran startowy - ustaw liczbe agentow i uruchom symulacje.
 - `Space` - pauza / wznowienie.
 - `Esc` - zamknij symulacje.
 

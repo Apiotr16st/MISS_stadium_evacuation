@@ -6,7 +6,7 @@ import json
 import math
 import random
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -688,6 +688,88 @@ def draw_ui(
         y = draw_text(surface, font, "Ewakuacja zakonczona", x, y + 18, pygame.Color("#9ef0b5"))
 
 
+def run_config_panel(
+    screen: pygame.Surface,
+    clock: pygame.time.Clock,
+    font: pygame.font.Font,
+    small_font: pygame.font.Font,
+    config: StadiumConfig,
+) -> int | None:
+    count_text = str(config.crowd_count)
+    input_active = True
+    width, height = screen.get_size()
+
+    panel = pygame.Rect(0, 0, min(430, width - 60), 250)
+    panel.center = (width // 2, height // 2)
+    input_rect = pygame.Rect(panel.left + 34, panel.top + 112, panel.width - 68, 42)
+    minus_rect = pygame.Rect(panel.left + 34, panel.top + 154, 52, 38)
+    plus_rect = pygame.Rect(panel.left + 96, panel.top + 154, 52, 38)
+    start_rect = pygame.Rect(panel.right - 154, panel.top + 154, 120, 38)
+
+    while True:
+        clock.tick(config.fps)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    return None
+                if event.key == pygame.K_RETURN:
+                    return clamp_agent_count(count_text)
+                if event.key == pygame.K_BACKSPACE and input_active:
+                    count_text = count_text[:-1]
+                elif input_active and event.unicode.isdigit():
+                    count_text = (count_text + event.unicode).lstrip("0")[:4] or "0"
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                input_active = input_rect.collidepoint(event.pos)
+                if minus_rect.collidepoint(event.pos):
+                    count_text = str(max(1, clamp_agent_count(count_text) - 10))
+                elif plus_rect.collidepoint(event.pos):
+                    count_text = str(min(9999, clamp_agent_count(count_text) + 10))
+                elif start_rect.collidepoint(event.pos):
+                    return clamp_agent_count(count_text)
+
+        screen.fill(pygame.Color("#151a1f"))
+        pygame.draw.rect(screen, pygame.Color("#101418"), panel, border_radius=6)
+        pygame.draw.rect(screen, pygame.Color("#37424d"), panel, 1, border_radius=6)
+
+        y = draw_text(screen, font, "Konfiguracja symulacji", panel.left + 34, panel.top + 28, pygame.Color("#f4f7f8"))
+        draw_text(screen, small_font, "Liczba agentow", panel.left + 34, y + 18, pygame.Color("#b8c1c9"))
+
+        pygame.draw.rect(screen, pygame.Color("#20272e"), input_rect, border_radius=4)
+        pygame.draw.rect(
+            screen,
+            pygame.Color("#ffd166" if input_active else "#62707b"),
+            input_rect,
+            1,
+            border_radius=4,
+        )
+        draw_text(screen, font, count_text or "0", input_rect.left + 14, input_rect.top + 8, pygame.Color("#f4f7f8"))
+
+        draw_button(screen, small_font, minus_rect, "-10")
+        draw_button(screen, small_font, plus_rect, "+10")
+        draw_button(screen, small_font, start_rect, "Start")
+
+        pygame.display.flip()
+
+
+def clamp_agent_count(text: str) -> int:
+    try:
+        value = int(text)
+    except ValueError:
+        value = 1
+    return clamp_int(value, 1, 9999)
+
+
+def draw_button(surface: pygame.Surface, font: pygame.font.Font, rect: pygame.Rect, label: str) -> None:
+    pygame.draw.rect(surface, pygame.Color("#26313a"), rect, border_radius=4)
+    pygame.draw.rect(surface, pygame.Color("#62707b"), rect, 1, border_radius=4)
+    rendered = font.render(label, True, pygame.Color("#f4f7f8"))
+    surface.blit(rendered, rendered.get_rect(center=rect.center))
+
+
 def draw_text(
     surface: pygame.Surface,
     font: pygame.font.Font,
@@ -1075,9 +1157,6 @@ def main() -> int:
         pygame.quit()
         return 0
 
-    stadium = Stadium(config)
-    crowd = CrowdSimulation(stadium)
-
     world_w, world_h = config.world_size
     screen = pygame.display.set_mode((world_w + config.ui_width, world_h))
     pygame.display.set_caption(config.title)
@@ -1085,6 +1164,15 @@ def main() -> int:
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("segoeui", 22, bold=True)
     small_font = pygame.font.SysFont("segoeui", 16)
+
+    selected_count = run_config_panel(screen, clock, font, small_font, config)
+    if selected_count is None:
+        pygame.quit()
+        return 0
+
+    config = replace(config, crowd_count=selected_count)
+    stadium = Stadium(config)
+    crowd = CrowdSimulation(stadium)
     running = True
 
     while running:
