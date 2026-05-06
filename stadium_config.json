@@ -1,6 +1,6 @@
 {
   "window": {
-    "title": "MISS - model pojedynczej trybuny stadionu",
+    "title": "MISS",
     "fps": 60,
     "ui_width": 300
   },
@@ -65,9 +65,8 @@
       "#.....................SSS....................#",
       "#DDDDDDDDDDDDDDDDDDSSSSSSSSSDDDDDDDDDDDDDDDDD#",
       "#..................SSSSSSSSS.................#",
-      "#..................SSPDDDPSS.................#",
-      "#DDDDDDDDDDDDDDDDDDSSPTTTPSSDDDDDDDDDDDDDDDDD#",
-      "#..................SSP...PSS.................#",
+      "#DDDDDDDDDDDDDDDDDDSSPDDDPSSDDDDDDDDDDDDDDDDD#",
+      "#..................SSPTTTPSS.................#",
       "#DDDDDDDDDDDDDDDDDDSSP...PSSDDDDDDDDDDDDDDDDD#",
       "#..................SSP...PSS.................#",
       "#DDDDDDDDDDDDDDDDDDSSP.A.PSSDDDDDDDDDDDDDDDDD#",

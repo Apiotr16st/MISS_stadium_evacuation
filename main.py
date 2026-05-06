@@ -217,7 +217,8 @@ class Stadium:
     def is_walkable_cell(self, x: int, y: int) -> bool:
         if x < 0 or y < 0 or y >= self.config.height or x >= self.config.width:
             return False
-        return self.config.layout[y][x] not in self.config.solid_tiles
+        tile = self.config.layout[y][x]
+        return tile not in self.config.solid_tiles
 
     def desired_direction(self, position: Vec2) -> Vec2:
         x, y = self.cell_at_pixel(position)
@@ -686,17 +687,6 @@ def draw_ui(
     elif crowd.evacuated_count == len(crowd.agents):
         y = draw_text(surface, font, "Ewakuacja zakonczona", x, y + 18, pygame.Color("#9ef0b5"))
 
-    y += 26
-    y = draw_text(surface, font, "Legenda", x, y, pygame.Color("#f4f7f8"))
-    for symbol, style in config.tile_styles.items():
-        if symbol == "A":
-            continue
-        swatch = pygame.Rect(x, y + 12, 18, 18)
-        pygame.draw.rect(surface, style.color, swatch, border_radius=3)
-        pygame.draw.rect(surface, pygame.Color("#62707b"), swatch, 1, border_radius=3)
-        draw_text(surface, small_font, f"{symbol}  {style.name}", x + 28, y + 9, pygame.Color("#c9d2d9"))
-        y += 28
-
 
 def draw_text(
     surface: pygame.Surface,
@@ -712,6 +702,8 @@ def draw_text(
 
 
 def draw_edge(surface: pygame.Surface, rect: pygame.Rect, edge: str) -> None:
+    shadow = edge_shadow_rect(rect, edge)
+    pygame.draw.rect(surface, pygame.Color("#1b2026"), shadow, border_radius=2)
     pygame.draw.rect(surface, pygame.Color("#4f2229"), rect, border_radius=3)
     if edge == "D":
         pygame.draw.line(surface, pygame.Color("#8c3b45"), rect.midtop, rect.midbottom, 1)
@@ -722,9 +714,22 @@ def draw_edge(surface: pygame.Surface, rect: pygame.Rect, edge: str) -> None:
     pygame.draw.line(surface, pygame.Color("#2a1116"), rect.topright, rect.bottomright, 2)
 
 
+def edge_shadow_rect(rect: pygame.Rect, edge: str) -> pygame.Rect:
+    if edge == "D":
+        shadow = rect.copy()
+        shadow.height = max(3, rect.height // 2)
+        shadow.top = rect.bottom - 1
+        return shadow
+
+    shadow = rect.copy()
+    shadow.width = max(3, rect.width // 2)
+    shadow.left = rect.right - 1
+    return shadow
+
+
 def edge_rect(rect: pygame.Rect, style: TileStyle, edge: str, visual: bool) -> pygame.Rect:
-    width_ratio = style.visual_width_ratio if visual else style.collision_width_ratio
-    height_ratio = style.visual_height_ratio if visual else style.collision_height_ratio
+    width_ratio = 1.0 if visual else style.collision_width_ratio
+    height_ratio = 1.0 if visual else style.collision_height_ratio
     align_x = style.visual_align_x if visual else style.collision_align_x
     align_y = style.visual_align_y if visual else style.collision_align_y
     if edge == "P":
@@ -805,6 +810,25 @@ def build_compacted_dimensions(
     width = len(layout[0])
     col_widths = [tile_size for _ in range(width)]
     row_heights = [tile_size for _ in layout]
+
+    for y, row in enumerate(layout):
+        ratios = [
+            tile_styles[tile].visual_height_ratio
+            for tile in row
+            if has_horizontal_edge(tile_styles[tile])
+        ]
+        if ratios:
+            row_heights[y] = max(2, round(tile_size * max(ratios)))
+
+    for x in range(width):
+        ratios = [
+            tile_styles[layout[y][x]].visual_width_ratio
+            for y in range(len(layout))
+            if has_vertical_edge(tile_styles[layout[y][x]])
+        ]
+        if ratios:
+            col_widths[x] = max(2, round(tile_size * max(ratios)))
+
     return col_widths, row_heights
 
 
