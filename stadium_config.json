@@ -2,13 +2,23 @@
   "window": {
     "title": "MISS - model pojedynczej trybuny stadionu",
     "fps": 60,
-    "ui_width": 330
+    "ui_width": 300
   },
-  "tile_size": 26,
+  "tile_size": 20,
   "agent": {
-    "radius": 9,
-    "speed": 155,
+    "radius": 6,
+    "speed": 20,
     "color": "#ffd166"
+  },
+  "crowd": {
+    "count": 300,
+    "seed": 1,
+    "spawn_jitter": 4,
+    "repath_interval": 0.35,
+    "personal_space": 5,
+    "repulsion_strength": 130,
+    "wall_repulsion_strength": 100,
+    "max_speed_multiplier": 1.15
   },
   "layout": {
     "type": "text",
@@ -85,7 +95,9 @@
         "D"
       ],
       "visual_height_ratio": 0.35,
-      "collision_height_ratio": 1.0
+      "visual_align_y": "bottom",
+      "collision_height_ratio": 1.0,
+      "collision_align_y": "bottom"
     },
     "P": {
       "name": "pionowa sciana",
@@ -95,7 +107,9 @@
         "P"
       ],
       "visual_width_ratio": 0.35,
-      "collision_width_ratio": 1.0
+      "visual_align_x": "right",
+      "collision_width_ratio": 1.0,
+      "collision_align_x": "right"
     },
     "S": {
       "name": "schody",

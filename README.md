@@ -1,6 +1,6 @@
 # MISS - model trybuny w Pygame
 
-Prototyp pokazuje pojedyncza trybune stadionu jako siatke kafelkow. Agent porusza sie po korytarzach i schodach za pomoca WSAD, a sciany i rzedy blokuja ruch.
+Prototyp pokazuje pojedyncza trybune stadionu jako siatke kafelkow. Tlum agentow porusza sie automatycznie do tunelu ewakuacyjnego, unikajac scian i innych agentow. Czerwone podswietlenie pokazuje lokalne zageszczenie, dzieki czemu widac miejsca powstawania korkow.
 
 ## Uruchomienie
 
@@ -27,7 +27,24 @@ Glowny plik konfiguracyjny to `stadium_config.json`. Najwazniejsza czesc to `lay
 - `T` - tunel
 - `A` - start agenta
 
-`P` i `D` sa sciesnione: `P` zweza cala kolumne, a `D` obniza caly wiersz. Dzieki temu nie ma pustej czesci kratki obok cienkiej sciany.
+`P` i `D` sa cienkimi przeszkodami rysowanymi wewnatrz pelnego kafelka. Dzieki temu sciany moga wygladac jak barierki, ale ruch agentow nadal liczy sie na stabilnej siatce o rownych wymiarach.
+
+## Symulacja tlumu
+
+Parametry agentow ustawisz w sekcjach `agent` i `crowd`.
+
+- `agent.radius` - promien pojedynczej osoby.
+- `agent.speed` - bazowa predkosc marszu.
+- `crowd.count` - liczba agentow.
+- Agenci startuja rownomiernie na przejsciach trybuny, z pominieciem schodow i tunelu.
+- `crowd.personal_space` - dystans, ktory agent probuje utrzymac od innych.
+- `crowd.repulsion_strength` - sila odpychania miedzy agentami.
+- `crowd.wall_repulsion_strength` - sila odpychania od scian.
+
+Sterowanie:
+
+- `Space` - pauza / wznowienie.
+- `Esc` - zamknij symulacje.
 
 Grubosc scian ustawisz w `tiles`:
 
