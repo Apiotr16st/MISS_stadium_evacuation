@@ -1,12 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
-import pygame
-
-from utils import clamp_int
-
-
 def compose_full_stadium_layout(
     stand_layout: list[str],
     field_tile: str = "F",
@@ -20,8 +13,10 @@ def compose_full_stadium_layout(
 
     north = stack_layout_horizontal(stand_layout, horizontal_stands)
     south = mirror_layout_vertical(north)
-    west = stack_layout_vertical(rotate_layout_counterclockwise(stand_layout), vertical_stands)
-    east = stack_layout_vertical(rotate_layout_clockwise(stand_layout), vertical_stands)
+    west_stand = rotate_layout_counterclockwise(stand_layout)
+    east_stand = rotate_layout_clockwise(stand_layout)
+    west = stack_layout_vertical(west_stand, vertical_stands)
+    east = stack_layout_vertical(east_stand, vertical_stands)
 
     side_width = len(west[0])
     middle_width = max(field_width or len(north[0]), len(north[0]), len(south[0]))
@@ -31,14 +26,15 @@ def compose_full_stadium_layout(
     south = center_layout(south, middle_width, len(south), corner_tile)
     west = center_layout(west, side_width, middle_height, corner_tile)
     east = center_layout(east, side_width, middle_height, corner_tile)
+    corners = build_corner_blocks(stand_layout, side_width, len(north), corner_tile)
 
     rows: list[str] = []
-    for row in north:
-        rows.append(corner_tile * side_width + row + corner_tile * side_width)
+    for index, row in enumerate(north):
+        rows.append(corners["nw"][index] + row + corners["ne"][index])
     for index in range(middle_height):
         rows.append(west[index] + field_tile * middle_width + east[index])
-    for row in south:
-        rows.append(corner_tile * side_width + row + corner_tile * side_width)
+    for index, row in enumerate(south):
+        rows.append(corners["sw"][index] + row + corners["se"][index])
     return rows
 
 
@@ -48,7 +44,16 @@ def stack_layout_horizontal(layout: list[str], count: int) -> list[str]:
     validate_layout(layout)
     if count <= 0:
         raise ValueError("Liczba poziomych trybun musi byc dodatnia.")
-    return [row * count for row in layout]
+    if count == 1:
+        return list(layout)
+
+    stacked: list[str] = []
+    for row in layout:
+        parts = [row[:-1]]
+        parts.extend(row[1:-1] for _ in range(count - 2))
+        parts.append(row[1:])
+        stacked.append("".join(parts))
+    return stacked
 
 
 
@@ -57,7 +62,14 @@ def stack_layout_vertical(layout: list[str], count: int) -> list[str]:
     validate_layout(layout)
     if count <= 0:
         raise ValueError("Liczba pionowych trybun musi byc dodatnia.")
-    return layout * count
+    if count == 1:
+        return list(layout)
+
+    stacked = list(layout[:-1])
+    for _ in range(count - 2):
+        stacked.extend(layout[1:-1])
+    stacked.extend(layout[1:])
+    return stacked
 
 
 
@@ -76,6 +88,35 @@ def center_layout(layout: list[str], width: int, height: int, fill_tile: str) ->
         centered.append(fill_tile * left_padding + row + fill_tile * right_padding)
     centered.extend(fill_tile * width for _ in range(bottom_padding))
     return centered
+
+
+
+
+def build_corner_blocks(stand_layout: list[str], width: int, height: int, fill_tile: str) -> dict[str, list[str]]:
+    corner_layout = fit_layout(rotate_layout_counterclockwise(stand_layout), width, height, fill_tile)
+    nw = corner_layout
+    ne = center_layout(mirror_layout_horizontal(corner_layout), width, height, fill_tile)
+    sw = center_layout(mirror_layout_vertical(corner_layout), width, height, fill_tile)
+    se = center_layout(mirror_layout_vertical(mirror_layout_horizontal(corner_layout)), width, height, fill_tile)
+    return {"nw": nw, "ne": ne, "sw": sw, "se": se}
+
+
+
+
+def fit_layout(layout: list[str], width: int, height: int, fill_tile: str) -> list[str]:
+    validate_layout(layout)
+    current_width = len(layout[0])
+    current_height = len(layout)
+    x_offset = max(0, (current_width - width) // 2)
+    y_offset = max(0, (current_height - height) // 2)
+    cropped = [row[x_offset:x_offset + min(width, current_width)] for row in layout[y_offset:y_offset + min(height, current_height)]]
+    return center_layout(cropped, width, height, fill_tile)
+
+
+
+
+def mirror_layout_horizontal(layout: list[str]) -> list[str]:
+    return ["".join(transform_edge_tile(tile, "mirror_horizontal") for tile in reversed(row)) for row in layout]
 
 
 
@@ -113,6 +154,7 @@ def rotate_layout_counterclockwise(layout: list[str]) -> list[str]:
 def transform_edge_tile(tile: str, transform: str) -> str:
     transforms = {
         "mirror_vertical": {"D": "U", "U": "D", "P": "P", "L": "L"},
+        "mirror_horizontal": {"P": "L", "L": "P", "D": "D", "U": "U"},
         "clockwise": {"U": "P", "P": "D", "D": "L", "L": "U"},
         "counterclockwise": {"U": "L", "L": "D", "D": "P", "P": "U"},
     }

@@ -118,6 +118,7 @@ def load_config(config_path: Path) -> StadiumConfig:
     crowd_wall_repulsion_strength = float(crowd.get("wall_repulsion_strength", speed * 4.5))
     crowd_max_speed_multiplier = float(crowd.get("max_speed_multiplier", 1.45))
     crowd_collision_iterations = int(crowd.get("collision_iterations", 1))
+    crowd_congestion_weight = float(crowd.get("congestion_weight", 0.8))
 
     return StadiumConfig(
         title=title,
@@ -144,6 +145,7 @@ def load_config(config_path: Path) -> StadiumConfig:
         crowd_wall_repulsion_strength=crowd_wall_repulsion_strength,
         crowd_max_speed_multiplier=crowd_max_speed_multiplier,
         crowd_collision_iterations=max(1, crowd_collision_iterations),
+        crowd_congestion_weight=max(0.0, crowd_congestion_weight),
         config_path=config_path,
         col_widths=col_widths,
         row_heights=row_heights,
@@ -237,7 +239,7 @@ def expand_layout_if_needed(layout: list[str], layout_block: dict[str, Any]) -> 
         field_width=field_width,
         field_height=field_height,
     )
-    segment_count = horizontal_stands * 2 + vertical_stands * 2
+    segment_count = horizontal_stands * 2 + vertical_stands * 2 + 4
     return expanded, segment_count, scale_crowd
 
 

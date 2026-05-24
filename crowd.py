@@ -152,12 +152,15 @@ class CrowdSimulation:
         self.elapsed += dt
         self.repath_timer -= dt
         active = self._active_agents
+        buckets = self._agent_buckets(active)
         if self.repath_timer <= 0:
             self.repath_timer = self.stadium.config.crowd_repath_interval
+            planned_counts = {cell: len(agents) for cell, agents in buckets.items()}
             for agent in active:
-                agent.target_direction = self.stadium.desired_direction(agent.position)
+                agent.target_direction, target_cell = self._congestion_aware_direction(agent, planned_counts)
+                if target_cell is not None:
+                    planned_counts[target_cell] = planned_counts.get(target_cell, 0) + 1
 
-        buckets = self._agent_buckets(active)
         for agent in active:
             neighbors = self._nearby_agents(agent, buckets)
             agent.update(dt, self.stadium, neighbors, self.elapsed)
@@ -188,6 +191,42 @@ class CrowdSimulation:
     def draw_agents(self, surface: pygame.Surface) -> None:
         for agent in self._active_agents:
             agent.draw(surface)
+
+    def _congestion_aware_direction(
+        self,
+        agent: Agent,
+        planned_counts: dict[tuple[int, int], int],
+    ) -> tuple[Vec2, tuple[int, int] | None]:
+        config = self.stadium.config
+        x, y = self.stadium.cell_at_pixel(agent.position)
+        if not self.stadium.is_walkable_cell(x, y):
+            return Vec2(0, 0), None
+        if config.layout[y][x] in config.exit_tiles:
+            target = self.stadium.nearest_exit_center(agent.position)
+            return direction_to(agent.position, target), (x, y)
+
+        candidates: list[tuple[int, int]] = []
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if self.stadium.is_walkable_cell(nx, ny) and self.stadium.distance_to_exit[ny][nx] < math.inf:
+                candidates.append((nx, ny))
+        if not candidates:
+            return self.stadium.desired_direction(agent.position), None
+
+        def candidate_score(cell: tuple[int, int]) -> tuple[float, int, int]:
+            nx, ny = cell
+            congestion = planned_counts.get(cell, 0)
+            score = self.stadium.distance_to_exit[ny][nx] + congestion * config.crowd_congestion_weight
+            return score, ny, nx
+
+        target_cell = min(candidates, key=candidate_score)
+        target = cell_center(
+            target_cell,
+            config.col_lefts,
+            config.row_tops,
+            config.col_widths,
+            config.row_heights,
+        )
+        return direction_to(agent.position, target), target_cell
 
     def _agent_buckets(self, active: list[Agent]) -> dict[tuple[int, int], list[Agent]]:
         buckets: dict[tuple[int, int], list[Agent]] = {}
@@ -335,6 +374,15 @@ def evenly_spaced_cells(cells: list[tuple[int, int]], count: int) -> list[tuple[
         selected.append(cells[index % len(cells)])
         index += 1
     return selected
+
+
+
+
+def direction_to(position: Vec2, target: Vec2) -> Vec2:
+    delta = target - position
+    if delta.length_squared() == 0:
+        return Vec2(0, 0)
+    return delta.normalize()
 
 
 

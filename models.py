@@ -52,6 +52,7 @@ class StadiumConfig:
     crowd_wall_repulsion_strength: float
     crowd_max_speed_multiplier: float
     crowd_collision_iterations: int
+    crowd_congestion_weight: float
     config_path: Path
     col_widths: list[int]
     row_heights: list[int]

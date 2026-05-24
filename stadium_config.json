@@ -21,7 +21,8 @@
     "repulsion_strength": 130,
     "wall_repulsion_strength": 100,
     "max_speed_multiplier": 1.15,
-    "collision_iterations": 1
+    "collision_iterations": 1,
+    "congestion_weight": 0.8
   },
   "layout": {
     "type": "text",
