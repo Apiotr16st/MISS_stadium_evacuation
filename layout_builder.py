@@ -26,15 +26,14 @@ def compose_full_stadium_layout(
     south = center_layout(south, middle_width, len(south), corner_tile)
     west = center_layout(west, side_width, middle_height, corner_tile)
     east = center_layout(east, side_width, middle_height, corner_tile)
-    corners = build_corner_blocks(stand_layout, side_width, len(north), corner_tile)
 
     rows: list[str] = []
-    for index, row in enumerate(north):
-        rows.append(corners["nw"][index] + row + corners["ne"][index])
+    for row in north:
+        rows.append(corner_tile * side_width + row + corner_tile * side_width)
     for index in range(middle_height):
         rows.append(west[index] + field_tile * middle_width + east[index])
-    for index, row in enumerate(south):
-        rows.append(corners["sw"][index] + row + corners["se"][index])
+    for row in south:
+        rows.append(corner_tile * side_width + row + corner_tile * side_width)
     return rows
 
 
@@ -58,18 +57,6 @@ def build_full_stadium_sector_map(
     north_left = side_width + (middle_width - north_width) // 2
     west_top = stand_height + (middle_height - west_height) // 2
     sectors: dict[tuple[int, int], str] = {}
-
-    add_sector_rect(sectors, "north_west", 0, 0, side_width, stand_height)
-    add_sector_rect(sectors, "north_east", side_width + middle_width, 0, side_width, stand_height)
-    add_sector_rect(sectors, "south_west", 0, stand_height + middle_height, side_width, stand_height)
-    add_sector_rect(
-        sectors,
-        "south_east",
-        side_width + middle_width,
-        stand_height + middle_height,
-        side_width,
-        stand_height,
-    )
 
     current = north_left
     for index, width in enumerate(joined_span_sizes(stand_width, horizontal_stands), start=1):
@@ -162,35 +149,6 @@ def center_layout(layout: list[str], width: int, height: int, fill_tile: str) ->
 
 
 
-def build_corner_blocks(stand_layout: list[str], width: int, height: int, fill_tile: str) -> dict[str, list[str]]:
-    corner_layout = fit_layout(rotate_layout_counterclockwise(stand_layout), width, height, fill_tile)
-    nw = corner_layout
-    ne = center_layout(mirror_layout_horizontal(corner_layout), width, height, fill_tile)
-    sw = center_layout(mirror_layout_vertical(corner_layout), width, height, fill_tile)
-    se = center_layout(mirror_layout_vertical(mirror_layout_horizontal(corner_layout)), width, height, fill_tile)
-    return {"nw": nw, "ne": ne, "sw": sw, "se": se}
-
-
-
-
-def fit_layout(layout: list[str], width: int, height: int, fill_tile: str) -> list[str]:
-    validate_layout(layout)
-    current_width = len(layout[0])
-    current_height = len(layout)
-    x_offset = max(0, (current_width - width) // 2)
-    y_offset = max(0, (current_height - height) // 2)
-    cropped = [row[x_offset:x_offset + min(width, current_width)] for row in layout[y_offset:y_offset + min(height, current_height)]]
-    return center_layout(cropped, width, height, fill_tile)
-
-
-
-
-def mirror_layout_horizontal(layout: list[str]) -> list[str]:
-    return ["".join(transform_edge_tile(tile, "mirror_horizontal") for tile in reversed(row)) for row in layout]
-
-
-
-
 def mirror_layout_vertical(layout: list[str]) -> list[str]:
     return ["".join(transform_edge_tile(tile, "mirror_vertical") for tile in row) for row in reversed(layout)]
 
@@ -224,7 +182,6 @@ def rotate_layout_counterclockwise(layout: list[str]) -> list[str]:
 def transform_edge_tile(tile: str, transform: str) -> str:
     transforms = {
         "mirror_vertical": {"D": "U", "U": "D", "P": "P", "L": "L"},
-        "mirror_horizontal": {"P": "L", "L": "P", "D": "D", "U": "U"},
         "clockwise": {"U": "P", "P": "D", "D": "L", "L": "U"},
         "counterclockwise": {"U": "L", "L": "D", "D": "P", "P": "U"},
     }

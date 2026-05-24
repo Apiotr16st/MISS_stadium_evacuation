@@ -1,0 +1,16 @@
+{
+  "id": "bombing_east_sector",
+  "name": "Atak bombowy - sektor wschodni",
+  "type": "bombing",
+  "parameters": {
+    "incident": {
+      "sector_id": "east_1",
+      "local_cell": [18, 20]
+    },
+    "starts_at": 12.0,
+    "blast_radius": 12,
+    "flee_duration": 8.0,
+    "flee_force": 500.0,
+    "routing_cost": 25.0
+  }
+}

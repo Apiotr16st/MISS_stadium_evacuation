@@ -24,6 +24,7 @@ class Agent:
     evacuated_at: float | None = None
     panicked: bool = False
     hazard_exposure: float = 0.0
+    fleeing_until: float = 0.0
 
     def update(
         self,
@@ -32,6 +33,7 @@ class Agent:
         scenario: ScenarioRuntime,
         neighbors: list["Agent"],
         elapsed: float,
+        rng: random.Random,
     ) -> None:
         if self.evacuated:
             return
@@ -41,7 +43,11 @@ class Agent:
             desired = desired.normalize() * self.speed * scenario.speed_multiplier(self)
 
         force = (desired - self.velocity) * 3.8
-        force += self._agent_repulsion(neighbors, stadium.config, scenario.personal_space_multiplier(self))
+        force += self._agent_repulsion(neighbors, stadium.config, scenario.personal_space_multiplier(self), rng)
+        force += scenario.emergency_force(self, elapsed)
+        noise = scenario.motion_noise(self)
+        if noise > 0:
+            force += Vec2(1, 0).rotate(rng.uniform(0, 360)) * noise
         solid_rects = stadium.nearby_solid_rects(self.position, max(self.radius * 2.4, self.radius))
         force += self._wall_repulsion(solid_rects, stadium.config)
 
@@ -67,6 +73,7 @@ class Agent:
         neighbors: list["Agent"],
         config: StadiumConfig,
         personal_space_multiplier: float,
+        rng: random.Random,
     ) -> Vec2:
         force = Vec2(0, 0)
         personal_space = config.crowd_personal_space * personal_space_multiplier
@@ -77,7 +84,7 @@ class Agent:
             delta = self.position - other.position
             distance_sq = delta.length_squared()
             if distance_sq <= 0:
-                delta = Vec2(1, 0).rotate(random.uniform(0, 360))
+                delta = Vec2(1, 0).rotate(rng.uniform(0, 360))
                 distance_sq = 1
 
             distance = math.sqrt(distance_sq)
@@ -143,7 +150,9 @@ class CrowdSimulation:
         self.scenario = scenario or ScenarioRuntime(stadium, None)
         self.elapsed = 0.0
         self.paused = False
-        self.agents = spawn_agents(stadium, self.scenario)
+        self.routing_rng = random.Random(stadium.config.crowd_seed + 991)
+        self.motion_rng = random.Random(stadium.config.crowd_seed + 1991)
+        self.agents = spawn_agents(stadium)
         self.repath_timer = 0.0
         self.max_cell_count = 0
         self._active_agents = [agent for agent in self.agents if not agent.evacuated]
@@ -178,7 +187,7 @@ class CrowdSimulation:
 
         for agent in active:
             neighbors = self._nearby_agents(agent, buckets)
-            agent.update(dt, self.stadium, self.scenario, neighbors, self.elapsed)
+            agent.update(dt, self.stadium, self.scenario, neighbors, self.elapsed, self.motion_rng)
 
         self._resolve_agent_collisions(active, buckets)
         self._active_agents = [agent for agent in self.agents if not agent.evacuated]
@@ -204,8 +213,18 @@ class CrowdSimulation:
             pygame.draw.rect(surface, (255, 86, 55, intensity), self.stadium.tile_rect(x, y))
 
     def draw_hazard(self, surface: pygame.Surface) -> None:
+        scenario_type = self.scenario.config.type if self.scenario.config is not None else None
+        fill = (255, 125, 35, 92) if scenario_type == "fire" else (230, 40, 45, 110)
         for cell in self.scenario.hazard_cells:
-            pygame.draw.rect(surface, (255, 125, 35, 92), self.stadium.tile_rect(*cell))
+            pygame.draw.rect(surface, fill, self.stadium.tile_rect(*cell))
+        if self.scenario.config is None or self.elapsed < float(self.scenario.config.parameters["starts_at"]):
+            return
+        marker = self.scenario.marker_cell()
+        if marker is None:
+            return
+        rect = self.stadium.tile_rect(*marker)
+        marker_color = pygame.Color("#ff8a00" if scenario_type == "fire" else "#e63946")
+        pygame.draw.circle(surface, marker_color, rect.center, max(5, rect.width // 2), 2)
 
     def draw_agents(self, surface: pygame.Surface) -> None:
         for agent in self._active_agents:
@@ -240,7 +259,10 @@ class CrowdSimulation:
             )
             return score, ny, nx
 
-        target_cell = min(candidates, key=candidate_score)
+        if self.scenario.random_route_chance(agent) > 0 and self.routing_rng.random() < self.scenario.random_route_chance(agent):
+            target_cell = self.routing_rng.choice(candidates)
+        else:
+            target_cell = min(candidates, key=candidate_score)
         target = cell_center(
             target_cell,
             config.col_lefts,
@@ -313,10 +335,10 @@ class CrowdSimulation:
 
 
 
-def spawn_agents(stadium: Stadium, scenario: ScenarioRuntime) -> list[Agent]:
+def spawn_agents(stadium: Stadium) -> list[Agent]:
     config = stadium.config
     rng = random.Random(config.crowd_seed)
-    candidates = spawn_candidate_cells(stadium, scenario.sector_weights())
+    candidates = spawn_candidate_cells(stadium)
     agents: list[Agent] = []
 
     for index in range(config.crowd_count):
@@ -350,13 +372,9 @@ def spawn_agents(stadium: Stadium, scenario: ScenarioRuntime) -> list[Agent]:
 
 
 
-def spawn_candidate_cells(
-    stadium: Stadium,
-    sector_weights: dict[str, float] | None = None,
-) -> list[tuple[int, int]]:
+def spawn_candidate_cells(stadium: Stadium) -> list[tuple[int, int]]:
     config = stadium.config
     cells: list[tuple[int, int]] = []
-    cells_by_sector: dict[str, list[tuple[int, int]]] = {}
     for y, row in enumerate(config.layout):
         row_cells: list[tuple[int, int]] = []
         for x, tile in enumerate(row):
@@ -373,9 +391,6 @@ def spawn_candidate_cells(
             if stadium.distance_to_exit[y][x] == math.inf:
                 continue
             row_cells.append((x, y))
-            sector_id = config.metadata.cell_sectors.get((x, y))
-            if sector_id is not None:
-                cells_by_sector.setdefault(sector_id, []).append((x, y))
 
         if y % 2:
             row_cells.reverse()
@@ -385,36 +400,7 @@ def spawn_candidate_cells(
         spawn_x, spawn_y = stadium.cell_at_pixel(config.spawn_position)
         return [(spawn_x, spawn_y) for _ in range(config.crowd_count)]
 
-    if sector_weights is None:
-        return evenly_spaced_cells(cells, config.crowd_count)
-    return weighted_sector_cells(cells_by_sector, sector_weights, config.crowd_count)
-
-
-
-
-def weighted_sector_cells(
-    cells_by_sector: dict[str, list[tuple[int, int]]],
-    sector_weights: dict[str, float],
-    count: int,
-) -> list[tuple[int, int]]:
-    usable_weights = {
-        sector_id: weight
-        for sector_id, weight in sector_weights.items()
-        if weight > 0 and cells_by_sector.get(sector_id)
-    }
-    total_weight = sum(usable_weights.values())
-    if total_weight <= 0:
-        raise ValueError("Scenariusz rozkladu tlumu nie wskazuje zadnego sektora ze spawnem.")
-    exact = {sector_id: count * weight / total_weight for sector_id, weight in usable_weights.items()}
-    allocations = {sector_id: int(value) for sector_id, value in exact.items()}
-    remainder = count - sum(allocations.values())
-    ranked = sorted(exact, key=lambda sector_id: (exact[sector_id] - allocations[sector_id], sector_id), reverse=True)
-    for sector_id in ranked[:remainder]:
-        allocations[sector_id] += 1
-    selected: list[tuple[int, int]] = []
-    for sector_id in sorted(allocations):
-        selected.extend(evenly_spaced_cells(cells_by_sector[sector_id], allocations[sector_id]))
-    return selected
+    return evenly_spaced_cells(cells, config.crowd_count)
 
 
 

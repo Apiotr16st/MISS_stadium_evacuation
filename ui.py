@@ -37,6 +37,10 @@ def draw_ui(
     y = draw_text(surface, small_font, f"Na stadionie: {len(crowd.active_agents)}", x, y + 5, pygame.Color("#b8c1c9"))
     y = draw_text(surface, small_font, f"Ewakuowani: {crowd.evacuated_count}/{len(crowd.agents)}", x, y + 5, pygame.Color("#b8c1c9"))
     y = draw_text(surface, small_font, f"Max gestosc/kafelek: {crowd.max_cell_count}", x, y + 5, pygame.Color("#b8c1c9"))
+    y += 18
+    y = draw_text(surface, font, "Scenariusz", x, y, pygame.Color("#f4f7f8"))
+    for line in crowd.scenario.status_lines(crowd.elapsed):
+        y = draw_text(surface, small_font, line, x, y + 5, pygame.Color("#b8c1c9"))
     if crowd.paused:
         y = draw_text(surface, font, "Pauza", x, y + 18, pygame.Color("#ffd166"))
     elif crowd.evacuated_count == len(crowd.agents):

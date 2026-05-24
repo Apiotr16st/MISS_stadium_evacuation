@@ -250,7 +250,7 @@ def expand_layout_if_needed(
         field_height=field_height,
     )
     cell_sectors = build_full_stadium_sector_map(layout, expanded, horizontal_stands, vertical_stands)
-    segment_count = horizontal_stands * 2 + vertical_stands * 2 + 4
+    segment_count = horizontal_stands * 2 + vertical_stands * 2
     return expanded, segment_count, scale_crowd, cell_sectors
 
 

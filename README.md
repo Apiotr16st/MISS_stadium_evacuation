@@ -60,10 +60,9 @@ Sterowanie:
 
 Gotowe eksperymenty znajduja sie w katalogu `scenarios/` i mozna je wybrac na ekranie startowym:
 
-- opoznione otwarcie wskazanej bramy,
-- rozwijajaca sie strefa pozaru, ktora zwieksza koszt trasy bez zmiany geometrii,
-- nierowny rozklad agentow miedzy sektorami,
-- lokalna panika zmieniajaca zachowanie dotknietych agentow.
+- pozar w sektorze, ktory wylacza jego wyjscie i kieruje tlum do innych bram,
+- lokalna panika powodujaca chaotyczne decyzje trasy i mniej przewidywalny ruch,
+- atak bombowy, po ktorym pobliscy agenci natychmiast uciekaja od miejsca zdarzenia, a wyjscie sektora jest niedostepne.
 
 Kazde uruchomienie symulacji zapisuje jeden plik JSON w katalogu `results/`. Plik zawiera parametry przebiegu, zdarzenia scenariusza, probki czasowe, heatmape obciazenia oraz podsumowanie czasow ewakuacji. Przebieg konczy sie po ewakuacji wszystkich agentow, po osiagnieciu limitu czasu albo po zamknieciu symulacji.
 
