@@ -1,0 +1,14 @@
+{
+  "id": "delayed_north_gate",
+  "name": "Opozniona brama - trybuna polnocna",
+  "type": "delayed_gates",
+  "parameters": {
+    "gates": [
+      {
+        "sector_id": "north_2",
+        "exit_id": "exit_1",
+        "opens_at": 45.0
+      }
+    ]
+  }
+}

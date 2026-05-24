@@ -6,8 +6,8 @@ from typing import Any
 
 import pygame
 
-from layout_builder import compose_full_stadium_layout, validate_layout
-from models import StadiumConfig, TileStyle
+from layout_builder import build_full_stadium_sector_map, compose_full_stadium_layout, validate_layout
+from models import SectorExit, StadiumConfig, StadiumMetadata, TileStyle
 from utils import build_ends, build_offsets, cell_center
 
 
@@ -73,11 +73,13 @@ def load_config(config_path: Path) -> StadiumConfig:
     tile_styles = parse_tile_styles(raw.get("tiles", {}))
     layout_block = raw.get("layout", {})
     layout = load_layout(layout_block, raw, config_path.parent)
-    layout, stadium_segment_count, scale_crowd_by_segments = expand_layout_if_needed(layout, layout_block)
+    layout, stadium_segment_count, scale_crowd_by_segments, cell_sectors = expand_layout_if_needed(layout, layout_block)
 
     spawn_tile = str(layout_block.get("spawn_tile", "A"))
     floor_tile = str(layout_block.get("floor_tile", "."))
     spawn_cell, layout = extract_spawn_cell(layout, spawn_tile, floor_tile, raw.get("agent", {}))
+    exit_tiles = set(layout_block.get("exit_tiles", ["E", "T"]))
+    metadata = build_stadium_metadata(layout, cell_sectors, exit_tiles)
 
     known_tiles = set(tile_styles)
     unknown_tiles = sorted({tile for row in layout for tile in row if tile not in known_tiles})
@@ -100,7 +102,6 @@ def load_config(config_path: Path) -> StadiumConfig:
     }
     solid_tiles.update(layout_block.get("solid_tiles", []))
     stairs_tiles = set(layout_block.get("stairs_tiles", ["S"]))
-    exit_tiles = set(layout_block.get("exit_tiles", ["E", "T"]))
 
     agent = raw.get("agent", {})
     radius = float(agent.get("radius", max(5, tile_size * 0.34)))
@@ -147,6 +148,7 @@ def load_config(config_path: Path) -> StadiumConfig:
         crowd_collision_iterations=max(1, crowd_collision_iterations),
         crowd_congestion_weight=max(0.0, crowd_congestion_weight),
         config_path=config_path,
+        metadata=metadata,
         col_widths=col_widths,
         row_heights=row_heights,
         col_lefts=col_lefts,
@@ -206,7 +208,10 @@ def load_layout(layout_block: dict[str, Any], raw: dict[str, Any], base_path: Pa
 
 
 
-def expand_layout_if_needed(layout: list[str], layout_block: dict[str, Any]) -> tuple[list[str], int, bool]:
+def expand_layout_if_needed(
+    layout: list[str],
+    layout_block: dict[str, Any],
+) -> tuple[list[str], int, bool, dict[tuple[int, int], str]]:
     full_stadium = layout_block.get("full_stadium", False)
     if isinstance(full_stadium, dict):
         enabled = bool(full_stadium.get("enabled", True))
@@ -228,7 +233,12 @@ def expand_layout_if_needed(layout: list[str], layout_block: dict[str, Any]) -> 
         field_height = optional_positive_int(layout_block.get("field_height"))
 
     if not enabled:
-        return layout, 1, False
+        cell_sectors = {
+            (x, y): "stand_1"
+            for y, row in enumerate(layout)
+            for x in range(len(row))
+        }
+        return layout, 1, False, cell_sectors
 
     expanded = compose_full_stadium_layout(
         layout,
@@ -239,8 +249,54 @@ def expand_layout_if_needed(layout: list[str], layout_block: dict[str, Any]) -> 
         field_width=field_width,
         field_height=field_height,
     )
+    cell_sectors = build_full_stadium_sector_map(layout, expanded, horizontal_stands, vertical_stands)
     segment_count = horizontal_stands * 2 + vertical_stands * 2 + 4
-    return expanded, segment_count, scale_crowd
+    return expanded, segment_count, scale_crowd, cell_sectors
+
+
+
+
+def build_stadium_metadata(
+    layout: list[str],
+    cell_sectors: dict[tuple[int, int], str],
+    exit_tiles: set[str],
+) -> StadiumMetadata:
+    sector_cells: dict[str, list[tuple[int, int]]] = {}
+    for cell, sector_id in cell_sectors.items():
+        sector_cells.setdefault(sector_id, []).append(cell)
+
+    sector_bounds: dict[str, pygame.Rect] = {}
+    sector_exits: dict[str, tuple[SectorExit, ...]] = {}
+    for sector_id, cells in sector_cells.items():
+        xs = [cell[0] for cell in cells]
+        ys = [cell[1] for cell in cells]
+        sector_bounds[sector_id] = pygame.Rect(min(xs), min(ys), max(xs) - min(xs) + 1, max(ys) - min(ys) + 1)
+        exit_cells = {cell for cell in cells if layout[cell[1]][cell[0]] in exit_tiles}
+        groups: list[tuple[tuple[int, int], ...]] = []
+        while exit_cells:
+            start = min(exit_cells, key=lambda cell: (cell[1], cell[0]))
+            pending = [start]
+            exit_cells.remove(start)
+            group: list[tuple[int, int]] = []
+            while pending:
+                x, y = pending.pop()
+                group.append((x, y))
+                for neighbor in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                    if neighbor in exit_cells:
+                        exit_cells.remove(neighbor)
+                        pending.append(neighbor)
+            groups.append(tuple(sorted(group, key=lambda cell: (cell[1], cell[0]))))
+        sector_exits[sector_id] = tuple(
+            SectorExit(id=f"exit_{index}", sector_id=sector_id, cells=group)
+            for index, group in enumerate(groups, start=1)
+        )
+
+    return StadiumMetadata(
+        cell_sectors=cell_sectors,
+        sector_cells={sector_id: tuple(cells) for sector_id, cells in sector_cells.items()},
+        sector_bounds=sector_bounds,
+        sector_exits=sector_exits,
+    )
 
 
 

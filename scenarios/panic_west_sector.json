@@ -1,0 +1,16 @@
+{
+  "id": "panic_west_sector",
+  "name": "Panika lokalna - zachod",
+  "type": "panic",
+  "parameters": {
+    "incident": {
+      "sector_id": "west_1",
+      "local_cell": [18, 22]
+    },
+    "starts_at": 20.0,
+    "influence_radius": 18,
+    "speed_multiplier": 1.25,
+    "personal_space_multiplier": 0.65,
+    "congestion_weight_multiplier": 0.4
+  }
+}

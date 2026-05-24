@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pygame
 
@@ -24,6 +25,55 @@ class TileStyle:
     collision_height_ratio: float
     collision_align_x: str
     collision_align_y: str
+
+
+@dataclass(frozen=True)
+class SectorExit:
+    id: str
+    sector_id: str
+    cells: tuple[tuple[int, int], ...]
+
+
+@dataclass(frozen=True)
+class StadiumMetadata:
+    cell_sectors: dict[tuple[int, int], str]
+    sector_cells: dict[str, tuple[tuple[int, int], ...]]
+    sector_bounds: dict[str, pygame.Rect]
+    sector_exits: dict[str, tuple[SectorExit, ...]]
+
+
+@dataclass(frozen=True)
+class ScenarioConfig:
+    id: str
+    name: str
+    type: str
+    parameters: dict[str, Any]
+    source_path: Path
+
+
+@dataclass(frozen=True)
+class ScenarioChoice:
+    label: str
+    config: ScenarioConfig | None
+
+
+@dataclass(frozen=True)
+class SimulationSetup:
+    crowd_count: int
+    agent_radius: float
+    agent_speed: float
+    crowd_personal_space: float
+    crowd_congestion_weight: float
+    crowd_seed: int
+    crowd_spawn_jitter: float
+    crowd_repulsion_strength: float
+    crowd_wall_repulsion_strength: float
+    crowd_max_speed_multiplier: float
+    crowd_collision_iterations: int
+    crowd_repath_interval: float
+    max_duration: float
+    sample_interval: float
+    scenario: ScenarioConfig | None
 
 
 @dataclass(frozen=True)
@@ -54,6 +104,7 @@ class StadiumConfig:
     crowd_collision_iterations: int
     crowd_congestion_weight: float
     config_path: Path
+    metadata: StadiumMetadata
     col_widths: list[int]
     row_heights: list[int]
     col_lefts: list[int]

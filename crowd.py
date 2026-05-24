@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import pygame
 
 from models import StadiumConfig, Vec2
+from scenarios import ScenarioRuntime
 from stadium import Stadium
 from utils import cell_center, circle_intersects_rect, clamp, clamp_int
 
@@ -21,11 +22,14 @@ class Agent:
     target_direction: Vec2
     evacuated: bool = False
     evacuated_at: float | None = None
+    panicked: bool = False
+    hazard_exposure: float = 0.0
 
     def update(
         self,
         dt: float,
         stadium: "Stadium",
+        scenario: ScenarioRuntime,
         neighbors: list["Agent"],
         elapsed: float,
     ) -> None:
@@ -34,15 +38,15 @@ class Agent:
 
         desired = Vec2(self.target_direction)
         if desired.length_squared() > 0:
-            desired = desired.normalize() * self.speed
+            desired = desired.normalize() * self.speed * scenario.speed_multiplier(self)
 
         force = (desired - self.velocity) * 3.8
-        force += self._agent_repulsion(neighbors, stadium.config)
+        force += self._agent_repulsion(neighbors, stadium.config, scenario.personal_space_multiplier(self))
         solid_rects = stadium.nearby_solid_rects(self.position, max(self.radius * 2.4, self.radius))
         force += self._wall_repulsion(solid_rects, stadium.config)
 
         self.velocity += force * dt
-        max_speed = self.speed * stadium.config.crowd_max_speed_multiplier
+        max_speed = self.speed * scenario.speed_multiplier(self) * stadium.config.crowd_max_speed_multiplier
         if self.velocity.length() > max_speed:
             self.velocity.scale_to_length(max_speed)
 
@@ -50,14 +54,22 @@ class Agent:
         self._move_axis(Vec2(movement.x, 0), solid_rects)
         self._move_axis(Vec2(0, movement.y), solid_rects)
 
-        if stadium.is_evacuation_reached(self.position, self.radius):
+        if scenario.in_hazard(self.position):
+            self.hazard_exposure += dt
+
+        if scenario.is_evacuation_reached(self.position, self.radius):
             self.evacuated = True
             self.evacuated_at = elapsed
             self.velocity = Vec2(0, 0)
 
-    def _agent_repulsion(self, neighbors: list["Agent"], config: StadiumConfig) -> Vec2:
+    def _agent_repulsion(
+        self,
+        neighbors: list["Agent"],
+        config: StadiumConfig,
+        personal_space_multiplier: float,
+    ) -> Vec2:
         force = Vec2(0, 0)
-        personal_space = config.crowd_personal_space
+        personal_space = config.crowd_personal_space * personal_space_multiplier
         for other in neighbors:
             if other is self or other.evacuated:
                 continue
@@ -119,17 +131,19 @@ class Agent:
             return
         center = (round(self.position.x), round(self.position.y))
         pygame.draw.circle(surface, self.color, center, round(self.radius))
-        pygame.draw.circle(surface, pygame.Color("#1d1f24"), center, round(self.radius), 1)
+        outline = pygame.Color("#e63946") if self.panicked else pygame.Color("#1d1f24")
+        pygame.draw.circle(surface, outline, center, round(self.radius), 2 if self.panicked else 1)
 
 
 
 
 class CrowdSimulation:
-    def __init__(self, stadium: Stadium):
+    def __init__(self, stadium: Stadium, scenario: ScenarioRuntime | None = None):
         self.stadium = stadium
+        self.scenario = scenario or ScenarioRuntime(stadium, None)
         self.elapsed = 0.0
         self.paused = False
-        self.agents = spawn_agents(stadium)
+        self.agents = spawn_agents(stadium, self.scenario)
         self.repath_timer = 0.0
         self.max_cell_count = 0
         self._active_agents = [agent for agent in self.agents if not agent.evacuated]
@@ -152,6 +166,7 @@ class CrowdSimulation:
         self.elapsed += dt
         self.repath_timer -= dt
         active = self._active_agents
+        self.scenario.update(self.elapsed, active)
         buckets = self._agent_buckets(active)
         if self.repath_timer <= 0:
             self.repath_timer = self.stadium.config.crowd_repath_interval
@@ -163,7 +178,7 @@ class CrowdSimulation:
 
         for agent in active:
             neighbors = self._nearby_agents(agent, buckets)
-            agent.update(dt, self.stadium, neighbors, self.elapsed)
+            agent.update(dt, self.stadium, self.scenario, neighbors, self.elapsed)
 
         self._resolve_agent_collisions(active, buckets)
         self._active_agents = [agent for agent in self.agents if not agent.evacuated]
@@ -188,6 +203,10 @@ class CrowdSimulation:
             intensity = min(180, 35 + count * 24)
             pygame.draw.rect(surface, (255, 86, 55, intensity), self.stadium.tile_rect(x, y))
 
+    def draw_hazard(self, surface: pygame.Surface) -> None:
+        for cell in self.scenario.hazard_cells:
+            pygame.draw.rect(surface, (255, 125, 35, 92), self.stadium.tile_rect(*cell))
+
     def draw_agents(self, surface: pygame.Surface) -> None:
         for agent in self._active_agents:
             agent.draw(surface)
@@ -207,15 +226,18 @@ class CrowdSimulation:
 
         candidates: list[tuple[int, int]] = []
         for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-            if self.stadium.is_walkable_cell(nx, ny) and self.stadium.distance_to_exit[ny][nx] < math.inf:
+            if self.stadium.is_walkable_cell(nx, ny) and self.scenario.routing.distances[ny][nx] < math.inf:
                 candidates.append((nx, ny))
         if not candidates:
-            return self.stadium.desired_direction(agent.position), None
+            return Vec2(0, 0), None
 
         def candidate_score(cell: tuple[int, int]) -> tuple[float, int, int]:
             nx, ny = cell
             congestion = planned_counts.get(cell, 0)
-            score = self.stadium.distance_to_exit[ny][nx] + congestion * config.crowd_congestion_weight
+            score = (
+                self.scenario.routing.distances[ny][nx]
+                + congestion * config.crowd_congestion_weight * self.scenario.congestion_multiplier(agent)
+            )
             return score, ny, nx
 
         target_cell = min(candidates, key=candidate_score)
@@ -291,10 +313,10 @@ class CrowdSimulation:
 
 
 
-def spawn_agents(stadium: Stadium) -> list[Agent]:
+def spawn_agents(stadium: Stadium, scenario: ScenarioRuntime) -> list[Agent]:
     config = stadium.config
     rng = random.Random(config.crowd_seed)
-    candidates = spawn_candidate_cells(stadium)
+    candidates = spawn_candidate_cells(stadium, scenario.sector_weights())
     agents: list[Agent] = []
 
     for index in range(config.crowd_count):
@@ -328,9 +350,13 @@ def spawn_agents(stadium: Stadium) -> list[Agent]:
 
 
 
-def spawn_candidate_cells(stadium: Stadium) -> list[tuple[int, int]]:
+def spawn_candidate_cells(
+    stadium: Stadium,
+    sector_weights: dict[str, float] | None = None,
+) -> list[tuple[int, int]]:
     config = stadium.config
     cells: list[tuple[int, int]] = []
+    cells_by_sector: dict[str, list[tuple[int, int]]] = {}
     for y, row in enumerate(config.layout):
         row_cells: list[tuple[int, int]] = []
         for x, tile in enumerate(row):
@@ -347,6 +373,9 @@ def spawn_candidate_cells(stadium: Stadium) -> list[tuple[int, int]]:
             if stadium.distance_to_exit[y][x] == math.inf:
                 continue
             row_cells.append((x, y))
+            sector_id = config.metadata.cell_sectors.get((x, y))
+            if sector_id is not None:
+                cells_by_sector.setdefault(sector_id, []).append((x, y))
 
         if y % 2:
             row_cells.reverse()
@@ -356,7 +385,36 @@ def spawn_candidate_cells(stadium: Stadium) -> list[tuple[int, int]]:
         spawn_x, spawn_y = stadium.cell_at_pixel(config.spawn_position)
         return [(spawn_x, spawn_y) for _ in range(config.crowd_count)]
 
-    return evenly_spaced_cells(cells, config.crowd_count)
+    if sector_weights is None:
+        return evenly_spaced_cells(cells, config.crowd_count)
+    return weighted_sector_cells(cells_by_sector, sector_weights, config.crowd_count)
+
+
+
+
+def weighted_sector_cells(
+    cells_by_sector: dict[str, list[tuple[int, int]]],
+    sector_weights: dict[str, float],
+    count: int,
+) -> list[tuple[int, int]]:
+    usable_weights = {
+        sector_id: weight
+        for sector_id, weight in sector_weights.items()
+        if weight > 0 and cells_by_sector.get(sector_id)
+    }
+    total_weight = sum(usable_weights.values())
+    if total_weight <= 0:
+        raise ValueError("Scenariusz rozkladu tlumu nie wskazuje zadnego sektora ze spawnem.")
+    exact = {sector_id: count * weight / total_weight for sector_id, weight in usable_weights.items()}
+    allocations = {sector_id: int(value) for sector_id, value in exact.items()}
+    remainder = count - sum(allocations.values())
+    ranked = sorted(exact, key=lambda sector_id: (exact[sector_id] - allocations[sector_id], sector_id), reverse=True)
+    for sector_id in ranked[:remainder]:
+        allocations[sector_id] += 1
+    selected: list[tuple[int, int]] = []
+    for sector_id in sorted(allocations):
+        selected.extend(evenly_spaced_cells(cells_by_sector[sector_id], allocations[sector_id]))
+    return selected
 
 
 

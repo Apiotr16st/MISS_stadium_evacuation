@@ -40,6 +40,76 @@ def compose_full_stadium_layout(
 
 
 
+def build_full_stadium_sector_map(
+    stand_layout: list[str],
+    stadium_layout: list[str],
+    horizontal_stands: int,
+    vertical_stands: int,
+) -> dict[tuple[int, int], str]:
+    validate_layout(stand_layout)
+    validate_layout(stadium_layout)
+    stand_width = len(stand_layout[0])
+    stand_height = len(stand_layout)
+    side_width = stand_height
+    middle_width = len(stadium_layout[0]) - side_width * 2
+    middle_height = len(stadium_layout) - stand_height * 2
+    north_width = len(stack_layout_horizontal(stand_layout, horizontal_stands)[0])
+    west_height = len(stack_layout_vertical(rotate_layout_counterclockwise(stand_layout), vertical_stands))
+    north_left = side_width + (middle_width - north_width) // 2
+    west_top = stand_height + (middle_height - west_height) // 2
+    sectors: dict[tuple[int, int], str] = {}
+
+    add_sector_rect(sectors, "north_west", 0, 0, side_width, stand_height)
+    add_sector_rect(sectors, "north_east", side_width + middle_width, 0, side_width, stand_height)
+    add_sector_rect(sectors, "south_west", 0, stand_height + middle_height, side_width, stand_height)
+    add_sector_rect(
+        sectors,
+        "south_east",
+        side_width + middle_width,
+        stand_height + middle_height,
+        side_width,
+        stand_height,
+    )
+
+    current = north_left
+    for index, width in enumerate(joined_span_sizes(stand_width, horizontal_stands), start=1):
+        add_sector_rect(sectors, f"north_{index}", current, 0, width, stand_height)
+        add_sector_rect(sectors, f"south_{index}", current, stand_height + middle_height, width, stand_height)
+        current += width
+
+    current = west_top
+    for index, height in enumerate(joined_span_sizes(stand_width, vertical_stands), start=1):
+        add_sector_rect(sectors, f"west_{index}", 0, current, side_width, height)
+        add_sector_rect(sectors, f"east_{index}", side_width + middle_width, current, side_width, height)
+        current += height
+    return sectors
+
+
+
+
+def joined_span_sizes(size: int, count: int) -> list[int]:
+    if count <= 1:
+        return [size]
+    return [size - 1] + [size - 2 for _ in range(count - 2)] + [size - 1]
+
+
+
+
+def add_sector_rect(
+    sectors: dict[tuple[int, int], str],
+    sector_id: str,
+    left: int,
+    top: int,
+    width: int,
+    height: int,
+) -> None:
+    for y in range(top, top + height):
+        for x in range(left, left + width):
+            sectors[(x, y)] = sector_id
+
+
+
+
 def stack_layout_horizontal(layout: list[str], count: int) -> list[str]:
     validate_layout(layout)
     if count <= 0:

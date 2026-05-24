@@ -52,9 +52,20 @@ Parametry agentow ustawisz w sekcjach `agent` i `crowd`.
 
 Sterowanie:
 
-- Ekran startowy - ustaw liczbe agentow i uruchom symulacje.
+- Ekran startowy - ustaw liczbe i parametry agentow, wybierz scenariusz oraz opcjonalnie rozwin ustawienia zaawansowane.
 - `Space` - pauza / wznowienie.
 - `Esc` - zamknij symulacje.
+
+## Scenariusze i wyniki
+
+Gotowe eksperymenty znajduja sie w katalogu `scenarios/` i mozna je wybrac na ekranie startowym:
+
+- opoznione otwarcie wskazanej bramy,
+- rozwijajaca sie strefa pozaru, ktora zwieksza koszt trasy bez zmiany geometrii,
+- nierowny rozklad agentow miedzy sektorami,
+- lokalna panika zmieniajaca zachowanie dotknietych agentow.
+
+Kazde uruchomienie symulacji zapisuje jeden plik JSON w katalogu `results/`. Plik zawiera parametry przebiegu, zdarzenia scenariusza, probki czasowe, heatmape obciazenia oraz podsumowanie czasow ewakuacji. Przebieg konczy sie po ewakuacji wszystkich agentow, po osiagnieciu limitu czasu albo po zamknieciu symulacji.
 
 Grubosc scian ustawisz w `tiles`:
 

@@ -196,14 +196,17 @@ class Stadium:
 
 def build_exit_route_maps(
     config: StadiumConfig,
+    active_exit_cells: set[tuple[int, int]] | None = None,
+    additional_costs: dict[tuple[int, int], float] | None = None,
 ) -> tuple[list[list[float]], list[list[tuple[int, int] | None]]]:
     distances = [[math.inf for _ in range(config.width)] for _ in range(config.height)]
     next_cells: list[list[tuple[int, int] | None]] = [[None for _ in range(config.width)] for _ in range(config.height)]
     queue: list[tuple[float, int, int]] = []
+    additional_costs = additional_costs or {}
 
     for y, row in enumerate(config.layout):
         for x, tile in enumerate(row):
-            if tile in config.exit_tiles:
+            if tile in config.exit_tiles and (active_exit_cells is None or (x, y) in active_exit_cells):
                 distances[y][x] = 0
                 heapq.heappush(queue, (0, x, y))
 
@@ -212,7 +215,7 @@ def build_exit_route_maps(
         if current_cost > distances[y][x]:
             continue
         for nx, ny in walkable_neighbors(x, y, config):
-            step_cost = movement_cost(config.layout[ny][nx], config)
+            step_cost = movement_cost(config.layout[ny][nx], config) + additional_costs.get((nx, ny), 0.0)
             new_cost = distances[y][x] + step_cost
             if new_cost < distances[ny][nx]:
                 distances[ny][nx] = new_cost

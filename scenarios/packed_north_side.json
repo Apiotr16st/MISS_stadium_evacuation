@@ -1,0 +1,15 @@
+{
+  "id": "packed_north_side",
+  "name": "Nierowne oblozenie - polnoc",
+  "type": "uneven_crowd",
+  "parameters": {
+    "sector_weights": {
+      "north_1": 3.0,
+      "north_2": 4.0,
+      "north_3": 3.0,
+      "south_1": 0.25,
+      "south_2": 0.25,
+      "south_3": 0.25
+    }
+  }
+}
