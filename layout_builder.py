@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 def compose_full_stadium_layout(
     stand_layout: list[str],
     field_tile: str = "F",
@@ -34,7 +35,16 @@ def compose_full_stadium_layout(
         rows.append(west[index] + field_tile * middle_width + east[index])
     for row in south:
         rows.append(corner_tile * side_width + row + corner_tile * side_width)
-    return rows
+    return fill_corner_wedges(
+        rows,
+        north,
+        south,
+        west,
+        east,
+        side_width,
+        middle_width,
+        middle_height,
+    )
 
 
 
@@ -69,7 +79,98 @@ def build_full_stadium_sector_map(
         add_sector_rect(sectors, f"west_{index}", 0, current, side_width, height)
         add_sector_rect(sectors, f"east_{index}", side_width + middle_width, current, side_width, height)
         current += height
+    add_corner_sector_wedges(
+        sectors,
+        side_width,
+        stand_height,
+        middle_width,
+        middle_height,
+        horizontal_stands,
+        vertical_stands,
+    )
     return sectors
+
+
+def fill_corner_wedges(
+    stadium_rows: list[str],
+    north: list[str],
+    south: list[str],
+    west: list[str],
+    east: list[str],
+    corner_size: int,
+    middle_width: int,
+    middle_height: int,
+) -> list[str]:
+    grid = [list(row) for row in stadium_rows]
+    north_top = 0
+    south_top = len(north) + middle_height
+    east_left = corner_size + middle_width
+
+    for y in range(corner_size):
+        for x in range(corner_size):
+            if y < x:
+                grid[north_top + y][x] = north[y][1]
+            else:
+                grid[north_top + y][x] = west[1][x]
+
+            if y < corner_size - 1 - x:
+                grid[north_top + y][east_left + x] = north[y][-2]
+            else:
+                grid[north_top + y][east_left + x] = east[1][x]
+
+            if y < corner_size - 1 - x:
+                grid[south_top + y][x] = west[-2][x]
+            else:
+                grid[south_top + y][x] = south[y][1]
+
+            if y < x:
+                grid[south_top + y][east_left + x] = east[-2][x]
+            else:
+                grid[south_top + y][east_left + x] = south[y][-2]
+
+    for y in range(corner_size - 1):
+        grid[north_top + y][corner_size] = north[y][1]
+        grid[north_top + y][east_left - 1] = north[y][-2]
+        grid[south_top + y][corner_size] = south[y][1]
+        grid[south_top + y][east_left - 1] = south[y][-2]
+
+    middle_top = len(north)
+    for x in range(1, corner_size):
+        grid[middle_top][x] = west[1][x]
+        grid[middle_top][east_left + x] = east[1][x]
+        grid[middle_top + middle_height - 1][x] = west[-2][x]
+        grid[middle_top + middle_height - 1][east_left + x] = east[-2][x]
+
+    return ["".join(row) for row in grid]
+
+
+def add_corner_sector_wedges(
+    sectors: dict[tuple[int, int], str],
+    corner_width: int,
+    corner_height: int,
+    middle_width: int,
+    middle_height: int,
+    horizontal_stands: int,
+    vertical_stands: int,
+) -> None:
+    east_left = corner_width + middle_width
+    south_top = corner_height + middle_height
+    for y in range(corner_height):
+        for x in range(corner_width):
+            sectors[(x, y)] = "north_1" if y < x else "west_1"
+            sectors[(east_left + x, y)] = (
+                f"north_{horizontal_stands}"
+                if y < corner_height - 1 - x
+                else "east_1"
+            )
+            sectors[(x, south_top + y)] = (
+                f"west_{vertical_stands}" if y < corner_height - 1 - x else "south_1"
+            )
+            sectors[(east_left + x, south_top + y)] = (
+                f"east_{vertical_stands}"
+                if y < x
+                else f"south_{horizontal_stands}"
+            )
 
 
 

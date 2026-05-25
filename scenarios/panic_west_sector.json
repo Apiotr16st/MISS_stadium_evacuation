@@ -5,7 +5,7 @@
   "parameters": {
     "incident": {
       "sector_id": "west_1",
-      "local_cell": [18, 22]
+      "local_cell": [18, 58]
     },
     "starts_at": 20.0,
     "influence_radius": 18,

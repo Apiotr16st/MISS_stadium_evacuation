@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-
 import pygame
 
 from models import TileStyle
@@ -94,28 +92,19 @@ def draw_field_markings(surface: pygame.Surface, rect: pygame.Rect) -> None:
     pygame.draw.rect(surface, line_color, right_goal, line_width)
 
     spot_radius = max(2, line_width + 1)
-    left_spot = (pitch.left + max(penalty_w // 2, pitch.width // 12), pitch.centery)
-    right_spot = (pitch.right - max(penalty_w // 2, pitch.width // 12), pitch.centery)
+    spot_offset = max(penalty_w // 2, round(pitch.width * 0.105))
+    left_spot = (pitch.left + spot_offset, pitch.centery)
+    right_spot = (pitch.right - spot_offset, pitch.centery)
     pygame.draw.circle(surface, line_color, left_spot, spot_radius)
     pygame.draw.circle(surface, line_color, right_spot, spot_radius)
 
-    arc_radius = max(12, center_radius // 2)
-    pygame.draw.arc(
-        surface,
-        line_color,
-        pygame.Rect(left_spot[0] - arc_radius, left_spot[1] - arc_radius, arc_radius * 2, arc_radius * 2),
-        -math.pi / 4,
-        math.pi / 4,
-        line_width,
-    )
-    pygame.draw.arc(
-        surface,
-        line_color,
-        pygame.Rect(right_spot[0] - arc_radius, right_spot[1] - arc_radius, arc_radius * 2, arc_radius * 2),
-        math.pi * 3 / 4,
-        math.pi * 5 / 4,
-        line_width,
-    )
+    arc_radius = max(12, round(pitch.width * 0.087))
+    previous_clip = surface.get_clip()
+    surface.set_clip(previous_clip.clip(pygame.Rect(left_penalty.right, pitch.top, pitch.width, pitch.height)))
+    pygame.draw.circle(surface, line_color, left_spot, arc_radius, line_width)
+    surface.set_clip(previous_clip.clip(pygame.Rect(pitch.left, pitch.top, right_penalty.left - pitch.left, pitch.height)))
+    pygame.draw.circle(surface, line_color, right_spot, arc_radius, line_width)
+    surface.set_clip(previous_clip)
 
 
 

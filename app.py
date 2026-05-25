@@ -9,7 +9,7 @@ from pathlib import Path
 import pygame
 
 from config_loader import load_config
-from crowd import CrowdSimulation
+from crowd import CrowdSimulation, spawn_capacity
 from experiments import ExperimentRecorder
 from models import ScaledSurfaceCache
 from scenarios import ScenarioRuntime, load_scenario_catalog
@@ -61,7 +61,17 @@ def main() -> int:
     small_font = pygame.font.SysFont("segoeui", 16)
 
     scenario_choices, scenario_errors = load_scenario_catalog(Path("scenarios"), config)
-    setup = run_config_panel(screen, clock, font, small_font, config, scenario_choices, scenario_errors)
+    max_crowd_count = spawn_capacity(Stadium(config))
+    setup = run_config_panel(
+        screen,
+        clock,
+        font,
+        small_font,
+        config,
+        scenario_choices,
+        scenario_errors,
+        max_crowd_count,
+    )
     if setup is None:
         pygame.quit()
         return 0

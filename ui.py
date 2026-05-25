@@ -119,16 +119,17 @@ def run_config_panel(
     config: StadiumConfig,
     scenario_choices: list[ScenarioChoice],
     scenario_errors: list[str],
+    max_crowd_count: int,
 ) -> SimulationSetup | None:
     basic_specs = [
-        InputSpec("Liczba agentow", "crowd_count", str(config.crowd_count), True),
+        InputSpec(f"Liczba agentow (max {max_crowd_count})", "crowd_count", str(config.crowd_count), True),
         InputSpec("Promien agenta", "agent_radius", str(config.agent_radius)),
         InputSpec("Predkosc bazowa", "agent_speed", str(config.agent_speed)),
         InputSpec("Dystans osobisty", "crowd_personal_space", str(config.crowd_personal_space)),
         InputSpec("Waga zatloczenia", "crowd_congestion_weight", str(config.crowd_congestion_weight), False, True),
         InputSpec("Limit czasu [s]", "max_duration", "300"),
     ]
-    advanced_specs = [
+    runtime_specs = [
         InputSpec("Seed", "crowd_seed", str(config.crowd_seed), True, True),
         InputSpec("Spawn jitter", "crowd_spawn_jitter", str(config.crowd_spawn_jitter), False, True),
         InputSpec("Odpychanie agentow", "crowd_repulsion_strength", str(config.crowd_repulsion_strength), False, True),
@@ -138,28 +139,28 @@ def run_config_panel(
         InputSpec("Interwal trasy [s]", "crowd_repath_interval", str(config.crowd_repath_interval)),
         InputSpec("Interwal zapisu [s]", "sample_interval", "1.0"),
     ]
-    specs = basic_specs + advanced_specs
+    specs = basic_specs + runtime_specs
     values = {spec.key: spec.default for spec in specs}
     active_key: str | None = basic_specs[0].key
     selected_scenario = 0
-    advanced = False
     error_message = ""
 
     while True:
         clock.tick(config.fps)
         width, height = screen.get_size()
-        panel = pygame.Rect(0, 0, min(900, width - 40), min(640, height - 30))
+        panel = pygame.Rect(0, 0, min(548, width - 40), min(680, height - 30))
         panel.center = (width // 2, height // 2)
-        left = panel.left + 30
-        right = panel.left + panel.width // 2 + 12
-        field_width = panel.width // 2 - 52
-        basic_rects = build_input_rects(left, panel.top + 98, field_width, basic_specs)
-        advanced_rects = build_input_rects(right, panel.top + 98, field_width, advanced_specs)
-        scenario_rect = pygame.Rect(left, panel.top + 98 + len(basic_specs) * 52 + 14, field_width, 38)
+        padding = 32
+        left = panel.left + padding
+        field_width = panel.width - padding * 2
+        fields_top = panel.top + 108
+        row_height = 62
+        basic_rects = build_input_rects(left, fields_top, field_width, basic_specs, row_height)
+        scenario_top = fields_top + len(basic_specs) * row_height + 12
+        scenario_rect = pygame.Rect(left, scenario_top + 22, field_width, 38)
         prev_rect = pygame.Rect(scenario_rect.left, scenario_rect.top, 36, 38)
         next_rect = pygame.Rect(scenario_rect.right - 36, scenario_rect.top, 36, 38)
-        advanced_rect = pygame.Rect(left, panel.bottom - 57, 174, 34)
-        start_rect = pygame.Rect(panel.right - 154, panel.bottom - 60, 124, 38)
+        start_rect = pygame.Rect(panel.right - padding - 124, panel.bottom - 58, 124, 38)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -169,7 +170,11 @@ def run_config_panel(
                 if event.key == pygame.K_ESCAPE:
                     return None
                 if event.key == pygame.K_RETURN:
-                    setup, error_message = parse_setup(values, scenario_choices[selected_scenario].config)
+                    setup, error_message = parse_setup(
+                        values,
+                        scenario_choices[selected_scenario].config,
+                        max_crowd_count,
+                    )
                     if setup is not None:
                         return setup
                 if active_key is not None and event.key == pygame.K_BACKSPACE:
@@ -182,18 +187,16 @@ def run_config_panel(
                 for key, rect in basic_rects.items():
                     if rect.collidepoint(event.pos):
                         active_key = key
-                if advanced:
-                    for key, rect in advanced_rects.items():
-                        if rect.collidepoint(event.pos):
-                            active_key = key
                 if prev_rect.collidepoint(event.pos):
                     selected_scenario = (selected_scenario - 1) % len(scenario_choices)
                 elif next_rect.collidepoint(event.pos):
                     selected_scenario = (selected_scenario + 1) % len(scenario_choices)
-                elif advanced_rect.collidepoint(event.pos):
-                    advanced = not advanced
                 elif start_rect.collidepoint(event.pos):
-                    setup, error_message = parse_setup(values, scenario_choices[selected_scenario].config)
+                    setup, error_message = parse_setup(
+                        values,
+                        scenario_choices[selected_scenario].config,
+                        max_crowd_count,
+                    )
                     if setup is not None:
                         return setup
 
@@ -201,10 +204,17 @@ def run_config_panel(
         pygame.draw.rect(screen, pygame.Color("#101418"), panel, border_radius=6)
         pygame.draw.rect(screen, pygame.Color("#37424d"), panel, 1, border_radius=6)
 
-        draw_text(screen, font, "Konfiguracja eksperymentu", panel.left + 30, panel.top + 22, pygame.Color("#f4f7f8"))
-        draw_text(screen, small_font, "Parametry podstawowe", left, panel.top + 72, pygame.Color("#b8c1c9"))
+        draw_text(screen, font, "Konfiguracja eksperymentu", left, panel.top + 24, pygame.Color("#f4f7f8"))
+        pygame.draw.line(
+            screen,
+            pygame.Color("#26313a"),
+            (left, panel.top + 66),
+            (panel.right - padding, panel.top + 66),
+            1,
+        )
+        draw_text(screen, small_font, "Parametry", left, panel.top + 82, pygame.Color("#b8c1c9"))
         draw_inputs(screen, small_font, basic_specs, basic_rects, values, active_key)
-        draw_text(screen, small_font, "Scenariusz", scenario_rect.left, scenario_rect.top - 18, pygame.Color("#b8c1c9"))
+        draw_text(screen, small_font, "Scenariusz", scenario_rect.left, scenario_top, pygame.Color("#b8c1c9"))
         pygame.draw.rect(screen, pygame.Color("#20272e"), scenario_rect, border_radius=4)
         draw_button(screen, small_font, prev_rect, "<")
         draw_button(screen, small_font, next_rect, ">")
@@ -212,14 +222,17 @@ def run_config_panel(
         rendered = small_font.render(scenario_label, True, pygame.Color("#f4f7f8"))
         screen.blit(rendered, rendered.get_rect(center=scenario_rect.center))
 
-        if advanced:
-            draw_text(screen, small_font, "Parametry zaawansowane", right, panel.top + 72, pygame.Color("#b8c1c9"))
-            draw_inputs(screen, small_font, advanced_specs, advanced_rects, values, active_key)
-        draw_button(screen, small_font, advanced_rect, "Ukryj zaawansowane" if advanced else "Zaawansowane")
+        pygame.draw.line(
+            screen,
+            pygame.Color("#26313a"),
+            (left, panel.bottom - 76),
+            (panel.right - padding, panel.bottom - 76),
+            1,
+        )
         draw_button(screen, small_font, start_rect, "Start")
         status = error_message or (scenario_errors[0] if scenario_errors else "")
         if status:
-            draw_text(screen, small_font, status[:88], left, panel.bottom - 92, pygame.Color("#f28b82"))
+            draw_text(screen, small_font, status[:88], left, panel.bottom - 104, pygame.Color("#f28b82"))
 
         pygame.display.flip()
 
@@ -235,9 +248,15 @@ class InputSpec:
     allow_zero: bool = False
 
 
-def build_input_rects(left: int, top: int, width: int, specs: list[InputSpec]) -> dict[str, pygame.Rect]:
+def build_input_rects(
+    left: int,
+    top: int,
+    width: int,
+    specs: list[InputSpec],
+    row_height: int,
+) -> dict[str, pygame.Rect]:
     return {
-        spec.key: pygame.Rect(left, top + index * 52 + 18, width, 30)
+        spec.key: pygame.Rect(left, top + index * row_height + 22, width, 34)
         for index, spec in enumerate(specs)
     }
 
@@ -252,7 +271,7 @@ def draw_inputs(
 ) -> None:
     for spec in specs:
         rect = rects[spec.key]
-        draw_text(surface, font, spec.label, rect.left, rect.top - 17, pygame.Color("#b8c1c9"))
+        draw_text(surface, font, spec.label, rect.left, rect.top - 22, pygame.Color("#b8c1c9"))
         pygame.draw.rect(surface, pygame.Color("#20272e"), rect, border_radius=4)
         pygame.draw.rect(
             surface,
@@ -261,12 +280,13 @@ def draw_inputs(
             1,
             border_radius=4,
         )
-        draw_text(surface, font, values[spec.key], rect.left + 10, rect.top + 6, pygame.Color("#f4f7f8"))
+        draw_text(surface, font, values[spec.key], rect.left + 10, rect.top + 8, pygame.Color("#f4f7f8"))
 
 
 def parse_setup(
     values: dict[str, str],
     scenario: ScenarioConfig | None,
+    max_crowd_count: int,
 ) -> tuple[SimulationSetup | None, str]:
     try:
         parsed: dict[str, int | float] = {}
@@ -288,6 +308,8 @@ def parse_setup(
     }
     if any(float(parsed[key]) <= 0 for key in positive_keys):
         return None, "Parametry predkosci, czasu, liczby i rozmiaru musza byc dodatnie."
+    if int(parsed["crowd_count"]) > max_crowd_count:
+        return None, f"Maksymalna liczba agentow dla tego stadionu to {max_crowd_count}."
     non_negative_keys = {
         "crowd_congestion_weight",
         "crowd_spawn_jitter",

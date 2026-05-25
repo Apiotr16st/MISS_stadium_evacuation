@@ -30,8 +30,8 @@
       "enabled": true,
       "field_tile": "F",
       "corner_tile": "#",
-      "horizontal_stands": 3,
-      "vertical_stands": 2,
+      "horizontal_stands": 4,
+      "vertical_stands": 3,
       "scale_crowd_by_segments": true
     },
     "spawn_tile": "A",

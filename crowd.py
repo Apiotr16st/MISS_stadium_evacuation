@@ -374,6 +374,20 @@ def spawn_agents(stadium: Stadium) -> list[Agent]:
 
 def spawn_candidate_cells(stadium: Stadium) -> list[tuple[int, int]]:
     config = stadium.config
+    cells = available_spawn_cells(stadium)
+    if not cells:
+        spawn_x, spawn_y = stadium.cell_at_pixel(config.spawn_position)
+        return [(spawn_x, spawn_y) for _ in range(config.crowd_count)]
+
+    return evenly_spaced_cells(cells, config.crowd_count)
+
+
+def spawn_capacity(stadium: Stadium) -> int:
+    return len(available_spawn_cells(stadium))
+
+
+def available_spawn_cells(stadium: Stadium) -> list[tuple[int, int]]:
+    config = stadium.config
     cells: list[tuple[int, int]] = []
     for y, row in enumerate(config.layout):
         row_cells: list[tuple[int, int]] = []
@@ -395,12 +409,7 @@ def spawn_candidate_cells(stadium: Stadium) -> list[tuple[int, int]]:
         if y % 2:
             row_cells.reverse()
         cells.extend(row_cells)
-
-    if not cells:
-        spawn_x, spawn_y = stadium.cell_at_pixel(config.spawn_position)
-        return [(spawn_x, spawn_y) for _ in range(config.crowd_count)]
-
-    return evenly_spaced_cells(cells, config.crowd_count)
+    return cells
 
 
 
