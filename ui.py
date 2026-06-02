@@ -128,6 +128,7 @@ def run_config_panel(
         InputSpec("Dystans osobisty", "crowd_personal_space", str(config.crowd_personal_space)),
         InputSpec("Waga zatloczenia", "crowd_congestion_weight", str(config.crowd_congestion_weight), False, True),
         InputSpec("Limit czasu [s]", "max_duration", "300"),
+        InputSpec("Start scenariusza", "scenario_start_time", "-1", False, True),
     ]
     runtime_specs = [
         InputSpec("Seed", "crowd_seed", str(config.crowd_seed), True, True),
@@ -154,7 +155,7 @@ def run_config_panel(
         left = panel.left + padding
         field_width = panel.width - padding * 2
         fields_top = panel.top + 108
-        row_height = 62
+        row_height = 56
         basic_rects = build_input_rects(left, fields_top, field_width, basic_specs, row_height)
         scenario_top = fields_top + len(basic_specs) * row_height + 12
         scenario_rect = pygame.Rect(left, scenario_top + 22, field_width, 38)
@@ -318,6 +319,8 @@ def parse_setup(
     }
     if any(float(parsed[key]) < 0 for key in non_negative_keys):
         return None, "Parametry sil i zatloczenia nie moga byc ujemne."
+    if float(parsed["scenario_start_time"]) < -1:
+        return None, "Start scenariusza musi byc >= 0 albo -1, aby uzyc pliku."
     return (
         SimulationSetup(
             crowd_count=int(parsed["crowd_count"]),
@@ -334,10 +337,17 @@ def parse_setup(
             crowd_repath_interval=float(parsed["crowd_repath_interval"]),
             max_duration=float(parsed["max_duration"]),
             sample_interval=float(parsed["sample_interval"]),
+            scenario_start_time=parse_scenario_start_time(float(parsed["scenario_start_time"]), scenario),
             scenario=scenario,
         ),
         "",
     )
+
+
+def parse_scenario_start_time(value: float, scenario: ScenarioConfig | None) -> float | None:
+    if scenario is None or value < 0:
+        return None
+    return value
 
 
 

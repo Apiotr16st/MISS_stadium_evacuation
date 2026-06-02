@@ -217,7 +217,7 @@ class CrowdSimulation:
         fill = (255, 125, 35, 92) if scenario_type == "fire" else (230, 40, 45, 110)
         for cell in self.scenario.hazard_cells:
             pygame.draw.rect(surface, fill, self.stadium.tile_rect(*cell))
-        if self.scenario.config is None or self.elapsed < float(self.scenario.config.parameters["starts_at"]):
+        if self.scenario.config is None or self.elapsed < self.scenario.start_time:
             return
         marker = self.scenario.marker_cell()
         if marker is None:

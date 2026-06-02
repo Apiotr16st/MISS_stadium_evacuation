@@ -14,6 +14,7 @@ class Stadium:
     def __init__(self, config: StadiumConfig):
         self.config = config
         self.tile_size = config.tile_size
+        self.minimum_cell_extent = max(1, min(config.col_widths + config.row_heights))
         self.neighborhood_cell_size = max(1, config.tile_size)
         self.distance_to_exit, self.next_cell_to_exit = build_exit_route_maps(config)
         self.exit_rects = self._build_exit_rects()

@@ -9,8 +9,10 @@
     },
     "starts_at": 12.0,
     "blast_radius": 12,
+    "avoidance_radius": 22,
     "flee_duration": 8.0,
     "flee_force": 500.0,
+    "avoidance_force": 90.0,
     "routing_cost": 25.0
   }
 }

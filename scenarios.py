@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -59,8 +60,13 @@ def validate_scenario(scenario: ScenarioConfig, config: StadiumConfig) -> None:
     parameters = scenario.parameters
     location_key = "origin" if scenario.type == "fire" else "incident"
     resolve_local_cell(parameters.get(location_key), config, location_key)
-    require_non_negative(parameters.get("starts_at"), "starts_at")
+    validate_trigger(parameters)
     if scenario.type == "fire":
+        require_non_negative(parameters.get("initial_radius"), "initial_radius")
+        require_positive(parameters.get("growth_per_second"), "growth_per_second")
+        max_radius = require_positive(parameters.get("max_radius"), "max_radius")
+        if max_radius < float(parameters["initial_radius"]):
+            raise ValueError("Parametr 'max_radius' nie moze byc mniejszy niz 'initial_radius'.")
         require_positive(parameters.get("routing_cost"), "routing_cost")
         return
     if scenario.type == "panic":
@@ -72,15 +78,27 @@ def validate_scenario(scenario: ScenarioConfig, config: StadiumConfig) -> None:
         require_non_negative(parameters.get("motion_noise"), "motion_noise")
         return
     require_positive(parameters.get("blast_radius"), "blast_radius")
+    if "avoidance_radius" in parameters:
+        avoidance_radius = require_positive(parameters.get("avoidance_radius"), "avoidance_radius")
+        if avoidance_radius < float(parameters["blast_radius"]):
+            raise ValueError("Parametr 'avoidance_radius' nie moze byc mniejszy niz 'blast_radius'.")
     require_positive(parameters.get("flee_duration"), "flee_duration")
     require_positive(parameters.get("flee_force"), "flee_force")
+    if "avoidance_force" in parameters:
+        require_non_negative(parameters.get("avoidance_force"), "avoidance_force")
     require_positive(parameters.get("routing_cost"), "routing_cost")
 
 
 class ScenarioRuntime:
-    def __init__(self, stadium: Stadium, scenario: ScenarioConfig | None):
+    def __init__(
+        self,
+        stadium: Stadium,
+        scenario: ScenarioConfig | None,
+        start_time_override: float | None = None,
+    ):
         self.stadium = stadium
         self.config = scenario
+        self.start_time = resolve_start_time(scenario, stadium.config.crowd_seed, start_time_override)
         self.events: list[dict[str, Any]] = []
         self._event_cursor = 0
         self.hazard_cells: set[tuple[int, int]] = set()
@@ -154,21 +172,34 @@ class ScenarioRuntime:
     def emergency_force(self, agent: Any, elapsed: float) -> Vec2:
         if self.config is None or self.config.type != "bombing" or self.incident_center is None:
             return Vec2(0, 0)
-        if elapsed >= getattr(agent, "fleeing_until", 0.0):
-            return Vec2(0, 0)
+        force = Vec2(0, 0)
         center = self.stadium.tile_rect(*self.incident_center).center
         delta = agent.position - Vec2(center)
         if delta.length_squared() == 0:
-            return Vec2(1, 0) * float(self.config.parameters["flee_force"])
+            delta = Vec2(1, 0)
+        if elapsed >= getattr(agent, "fleeing_until", 0.0):
+            avoidance_radius = float(self.config.parameters.get("avoidance_radius", self.config.parameters["blast_radius"]))
+            distance = math.dist(self.stadium.cell_at_pixel(agent.position), self.incident_center)
+            if distance >= avoidance_radius:
+                return force
+            strength = float(self.config.parameters.get("avoidance_force", 0.0))
+            falloff = (avoidance_radius - distance) / avoidance_radius
+            return delta.normalize() * strength * falloff
         return delta.normalize() * float(self.config.parameters["flee_force"])
 
     def in_hazard(self, position: Vec2) -> bool:
         return self.stadium.cell_at_pixel(position) in self.hazard_cells
 
     def is_evacuation_reached(self, position: Vec2, radius: float) -> bool:
-        for cell in self.routing.active_exit_cells:
-            if circle_intersects_rect(position, radius, self.stadium.tile_rect(*cell)):
-                return True
+        x, y = self.stadium.cell_at_pixel(position)
+        margin = max(1, math.ceil(radius / self.stadium.minimum_cell_extent))
+        config = self.stadium.config
+        for ny in range(max(0, y - margin), min(config.height, y + margin + 1)):
+            for nx in range(max(0, x - margin), min(config.width, x + margin + 1)):
+                if (nx, ny) not in self.routing.active_exit_cells:
+                    continue
+                if circle_intersects_rect(position, radius, self.stadium.tile_rect(nx, ny)):
+                    return True
         return False
 
     def marker_cell(self) -> tuple[int, int] | None:
@@ -181,12 +212,12 @@ class ScenarioRuntime:
         if self.config is None:
             return ["Brak"]
         lines = [self.config.name]
-        starts_at = float(self.config.parameters["starts_at"])
-        if elapsed < starts_at:
-            lines.append(f"Start za: {starts_at - elapsed:.1f} s")
+        if elapsed < self.start_time:
+            lines.append(f"Start za: {self.start_time - elapsed:.1f} s")
             return lines
         if self.config.type == "fire":
-            lines.append(f"Wylaczony sektor: {self.disabled_sector}")
+            lines.append(f"Promien: {self.hazard_radius:.1f} kaf.")
+            lines.append(f"Komorki zagrozenia: {len(self.hazard_cells)}")
         elif self.config.type == "panic":
             lines.append(f"Spanikowani: {self.panicked_total}")
             lines.append(f"Losowe trasy: {float(self.config.parameters['random_route_chance']) * 100:.0f}%")
@@ -197,32 +228,52 @@ class ScenarioRuntime:
         return lines
 
     def _update_fire(self, elapsed: float) -> None:
-        starts_at = float(self.config.parameters["starts_at"])
-        if elapsed < starts_at or self.hazard_started:
+        if elapsed < self.start_time:
             return
-        self.hazard_started = True
         sector_id = str(self.config.parameters["origin"]["sector_id"])
-        self.disabled_sector = sector_id
-        self.incident_center = resolve_local_cell(self.config.parameters["origin"], self.stadium.config, "origin")
-        self.hazard_cells = {
+        if self.incident_center is None:
+            self.incident_center = resolve_local_cell(self.config.parameters["origin"], self.stadium.config, "origin")
+        old_cells = self.hazard_cells
+        previous_radius = self.hazard_radius
+        active_time = max(0.0, elapsed - self.start_time)
+        initial_radius = float(self.config.parameters["initial_radius"])
+        growth = float(self.config.parameters["growth_per_second"])
+        max_radius = float(self.config.parameters["max_radius"])
+        self.hazard_radius = min(max_radius, initial_radius + active_time * growth)
+        new_cells = {
             cell for cell in self.stadium.config.metadata.sector_cells[sector_id]
             if self.stadium.is_walkable_cell(*cell)
+            and math.dist(cell, self.incident_center) <= self.hazard_radius
         }
-        self._disable_sector_exits(sector_id)
+        if new_cells == old_cells:
+            return
+        self.hazard_cells = new_cells
         cost = float(self.config.parameters["routing_cost"])
         self.routing.additional_costs = {cell: cost for cell in self.hazard_cells}
-        self.events.append(
-            {
-                "time": round(elapsed, 4),
-                "type": "fire_started",
-                "disabled_sector": sector_id,
-                "affected_cells": len(self.hazard_cells),
-            }
-        )
+        if not self.hazard_started:
+            self.hazard_started = True
+            self.events.append(
+                {
+                    "time": round(elapsed, 4),
+                    "type": "fire_started",
+                    "sector": sector_id,
+                    "radius": round(self.hazard_radius, 4),
+                    "affected_cells": len(self.hazard_cells),
+                }
+            )
+        elif math.floor(previous_radius) != math.floor(self.hazard_radius):
+            self.events.append(
+                {
+                    "time": round(elapsed, 4),
+                    "type": "fire_grew",
+                    "radius": round(self.hazard_radius, 4),
+                    "affected_cells": len(self.hazard_cells),
+                }
+            )
         self._rebuild_routes()
 
     def _update_panic(self, elapsed: float, agents: list[Any]) -> None:
-        if elapsed < float(self.config.parameters["starts_at"]):
+        if elapsed < self.start_time:
             return
         center = resolve_local_cell(self.config.parameters["incident"], self.stadium.config, "incident")
         radius = float(self.config.parameters["influence_radius"])
@@ -245,13 +296,14 @@ class ScenarioRuntime:
             )
 
     def _update_bombing(self, elapsed: float, agents: list[Any]) -> None:
-        if elapsed < float(self.config.parameters["starts_at"]) or self.hazard_started:
+        if elapsed < self.start_time or self.hazard_started:
             return
         self.hazard_started = True
         sector_id = str(self.config.parameters["incident"]["sector_id"])
         self.disabled_sector = sector_id
         self.incident_center = resolve_local_cell(self.config.parameters["incident"], self.stadium.config, "incident")
         blast_radius = float(self.config.parameters["blast_radius"])
+        avoidance_radius = float(self.config.parameters.get("avoidance_radius", blast_radius))
         self.hazard_radius = blast_radius
         self.hazard_cells = {
             cell for cell in self.stadium.config.metadata.sector_cells[sector_id]
@@ -261,7 +313,9 @@ class ScenarioRuntime:
         self._disable_sector_exits(sector_id)
         cost = float(self.config.parameters["routing_cost"])
         self.routing.additional_costs = {
-            cell: cost for cell in self.stadium.config.metadata.sector_cells[sector_id]
+            cell: cost * (1.0 + 1.5 * (avoidance_radius - math.dist(cell, self.incident_center)) / avoidance_radius)
+            for cell in self.stadium.config.metadata.sector_cells[sector_id]
+            if math.dist(cell, self.incident_center) <= avoidance_radius
         }
         affected = 0
         for agent in agents:
@@ -306,6 +360,40 @@ def resolve_exit_reference(reference: Any, config: StadiumConfig) -> set[tuple[i
         if exit_ref.id == exit_id:
             return set(exit_ref.cells)
     raise ValueError(f"Sektor {sector_id!r} nie ma wyjscia {exit_id!r}.")
+
+
+def validate_trigger(parameters: dict[str, Any]) -> None:
+    has_fixed = "starts_at" in parameters
+    has_range = "starts_after_range" in parameters
+    if has_fixed and has_range:
+        raise ValueError("Uzyj tylko jednego z pol: 'starts_at' albo 'starts_after_range'.")
+    if has_range:
+        value = parameters["starts_after_range"]
+        if not isinstance(value, list) or len(value) != 2:
+            raise ValueError("Parametr 'starts_after_range' musi zawierac [min, max].")
+        lower = require_non_negative(value[0], "starts_after_range[0]")
+        upper = require_non_negative(value[1], "starts_after_range[1]")
+        if upper < lower:
+            raise ValueError("Parametr 'starts_after_range' musi miec max >= min.")
+        return
+    require_non_negative(parameters.get("starts_at"), "starts_at")
+
+
+def resolve_start_time(
+    scenario: ScenarioConfig | None,
+    seed: int,
+    override: float | None = None,
+) -> float:
+    if scenario is None:
+        return 0.0
+    if override is not None:
+        return override
+    parameters = scenario.parameters
+    if "starts_after_range" not in parameters:
+        return float(parameters["starts_at"])
+    lower, upper = parameters["starts_after_range"]
+    rng = random.Random(f"{seed}:{scenario.id}:start")
+    return rng.uniform(float(lower), float(upper))
 
 
 def resolve_local_cell(reference: Any, config: StadiumConfig, name: str) -> tuple[int, int]:

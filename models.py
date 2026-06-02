@@ -73,6 +73,7 @@ class SimulationSetup:
     crowd_repath_interval: float
     max_duration: float
     sample_interval: float
+    scenario_start_time: float | None
     scenario: ScenarioConfig | None
 
 

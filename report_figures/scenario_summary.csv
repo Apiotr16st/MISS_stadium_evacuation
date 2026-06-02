@@ -1,0 +1,5 @@
+scenario;total_time_mean;agent_time_mean;p95_mean;max_density_mean;panicked_mean;exposure_mean
+Baseline;98.53;31.50;56.87;3.33;0.00;0.00
+Fire;98.53;31.51;56.87;3.33;0.00;18.01
+Bombing;138.86;34.76;71.68;3.00;33.67;160.86
+Panic;152.99;32.12;58.34;3.33;65.00;0.00

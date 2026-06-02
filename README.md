@@ -14,6 +14,20 @@ Sprawdzenie konfiguracji bez otwierania okna:
 .\.venv\Scripts\python.exe main.py --check-config
 ```
 
+Szybki eksperyment bez okna i renderowania:
+
+```powershell
+.\.venv\Scripts\python.exe main.py --headless --scenario fire_north_sector --agents 4200 --seed 1 --max-duration 300
+```
+
+W trybie `--headless` model wykonuje ten sam staly krok czasu `1/30 s` co wersja interaktywna. Czas zapisany do CSV jest czasem symulowanym, niezaleznym od czasu potrzebnego procesorowi na obliczenia.
+
+Moment startu scenariusza mozna nadpisac z komendy:
+
+```powershell
+.\.venv\Scripts\python.exe main.py --headless --scenario fire_north_sector --scenario-start 5 --agents 1000
+```
+
 ## Struktura kodu
 
 - `main.py` / `app.py` - wejscie aplikacji i glowna petla Pygame.
@@ -50,6 +64,7 @@ Parametry agentow ustawisz w sekcjach `agent` i `crowd`.
 - `crowd.repulsion_strength` - sila odpychania miedzy agentami.
 - `crowd.wall_repulsion_strength` - sila odpychania od scian.
 - `crowd.collision_iterations` - liczba iteracji rozdzielania kolizji agentow; nizsza wartosc jest szybsza na duzym stadionie.
+- Ruch i kolizje agentow sa aktualizowane stalym krokiem 30 Hz, niezaleznie od odswiezania obrazu.
 
 Sterowanie:
 
@@ -61,9 +76,11 @@ Sterowanie:
 
 Gotowe eksperymenty znajduja sie w katalogu `scenarios/` i mozna je wybrac na ekranie startowym:
 
-- pozar w sektorze, ktory wylacza jego wyjscie i kieruje tlum do innych bram,
+- lokalny pozar w sektorze, ktory startuje po stalym czasie albo po czasie losowanym z zakresu i stopniowo zwieksza koszt przejscia przez zagrozone kafelki,
 - lokalna panika powodujaca chaotyczne decyzje trasy i mniej przewidywalny ruch,
-- atak bombowy, po ktorym pobliscy agenci natychmiast uciekaja od miejsca zdarzenia, a wyjscie sektora jest niedostepne.
+- atak bombowy, po ktorym pobliscy agenci natychmiast uciekaja od miejsca zdarzenia, okolica incydentu pozostaje omijana, a wyjscie sektora jest niedostepne.
+
+Moment odpalenia scenariusza ustawisz w panelu startowym polem `Start scen. [s]`; wartosc `-1` oznacza uzycie konfiguracji z pliku. W samym pliku JSON dostepne jest `starts_at` albo losowany deterministycznie zakres `starts_after_range`, np. `"starts_after_range": [3.0, 9.0]`. Przy takim zakresie konkretny czas zalezy od seeda przebiegu i jest zapisywany w CSV jako `scenario_start_time`.
 
 Kazde uruchomienie symulacji zapisuje jeden plik CSV w katalogu `results/`. Plik jest rozdzielany srednikami i zawiera po jednym wierszu na probke czasu: podstawowe parametry przebiegu, liczby aktywnych i ewakuowanych agentow, gestosc, predkosc oraz stan scenariusza. Po zakonczeniu kazdy wiersz zawiera takze finalne podsumowanie czasow ewakuacji, co ulatwia porownywanie i wizualizacje przebiegow. Przebieg konczy sie po ewakuacji wszystkich agentow, po osiagnieciu limitu czasu albo po zamknieciu symulacji.
 

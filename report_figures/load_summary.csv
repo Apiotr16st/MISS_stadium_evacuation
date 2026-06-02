@@ -1,0 +1,7 @@
+agents;status;elapsed_time;evacuated;evacuated_percent;agent_time_mean;max_density
+500;completed;80.37;500;100.00;30.77;3
+1000;completed;104.37;1000;100.00;31.46;4
+2000;completed;113.03;2000;100.00;33.95;4
+4200;completed;113.83;4200;100.00;43.50;4
+7731;timed_out;300.00;7723;99.90;65.13;5
+11262;timed_out;300.00;11071;98.30;87.58;5
