@@ -1,0 +1,16 @@
+{
+  "id": "fire_north_sector",
+  "name": "Pozar - sektor north_2",
+  "type": "fire",
+  "parameters": {
+    "origin": {
+      "sector_id": "north_2",
+      "local_cell": [10, 12]
+    },
+    "starts_after_range": [3.0, 9.0],
+    "initial_radius": 5.0,
+    "growth_per_second": 0.35,
+    "max_radius": 24.0,
+    "routing_cost": 20.0
+  }
+}

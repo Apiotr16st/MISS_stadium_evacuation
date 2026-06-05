@@ -2,6 +2,8 @@
   "window": {
     "title": "MISS",
     "fps": 60,
+    "max_width": 1400,
+    "max_height": 900,
     "ui_width": 300
   },
   "tile_size": 20,
@@ -18,10 +20,20 @@
     "personal_space": 5,
     "repulsion_strength": 130,
     "wall_repulsion_strength": 100,
-    "max_speed_multiplier": 1.15
+    "max_speed_multiplier": 1.15,
+    "collision_iterations": 1,
+    "congestion_weight": 0.8
   },
   "layout": {
     "type": "text",
+    "full_stadium": {
+      "enabled": true,
+      "field_tile": "F",
+      "corner_tile": "#",
+      "horizontal_stands": 4,
+      "vertical_stands": 3,
+      "scale_crowd_by_segments": true
+    },
     "spawn_tile": "A",
     "floor_tile": ".",
     "solid_tiles": [
@@ -110,6 +122,30 @@
       "collision_width_ratio": 1.0,
       "collision_align_x": "right"
     },
+    "L": {
+      "name": "pionowa sciana lewa",
+      "color": "#693039",
+      "solid": true,
+      "edges": [
+        "P"
+      ],
+      "visual_width_ratio": 0.35,
+      "visual_align_x": "left",
+      "collision_width_ratio": 1.0,
+      "collision_align_x": "left"
+    },
+    "U": {
+      "name": "pozioma sciana gorna",
+      "color": "#693039",
+      "solid": true,
+      "edges": [
+        "D"
+      ],
+      "visual_height_ratio": 0.35,
+      "visual_align_y": "top",
+      "collision_height_ratio": 1.0,
+      "collision_align_y": "top"
+    },
     "S": {
       "name": "schody",
       "color": "#8d98a1",
@@ -129,6 +165,12 @@
       "name": "start agenta",
       "color": "#2b333b",
       "solid": false
+    },
+    "F": {
+      "name": "boisko / srodek stadionu",
+      "color": "#1f5f3a",
+      "solid": true,
+      "collision": false
     }
   },
   "image_palette": {
@@ -139,6 +181,7 @@
     "#8D98A1": "S",
     "#27915B": "E",
     "#0B1014": "T",
-    "#FFD166": "A"
+    "#FFD166": "A",
+    "#1F5F3A": "F"
   }
 }
